@@ -27,6 +27,7 @@ export interface SalesData {
 }
 
 export class DatabaseService {
+  public prisma = prisma;
   async createItem(data: ItemData) {
     return prisma.item.create({
       data,

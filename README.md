@@ -1,14 +1,21 @@
 # ThemeForest Sales Tracker
 
-A Next.js web application that automatically tracks and monitors sales data from ThemeForest items. The app scrapes item pages daily and provides a dashboard to view sales trends and statistics.
+A Next.js web application that automatically tracks and monitors sales data from ThemeForest items. The app scans item pages daily and provides comprehensive dashboards to view sales patterns and trends.
 
 ## Features
 
-- **Automated Daily Scanning**: Runs at midnight UTC to collect sales data
-- **Dashboard Interface**: Clean, responsive UI built with TailwindCSS
-- **Sales Analytics**: Track daily and weekly sales trends
+- **Multi-Dashboard Analytics**: Overview, Daily, Weekly, and Monthly sales dashboards with detailed breakdowns
+- **Hourly Pattern Analysis**: See which hours items sell the most (0-24h breakdown)
+- **Weekly Pattern Analysis**: Discover which days of the week perform best (Mon-Sun breakdown)
+- **Monthly Pattern Analysis**: Track seasonal trends and peak months (Jan-Dec breakdown)
+- **Automated Hourly Scanning**: Runs every hour in GMT+7 timezone to collect granular sales data
+- **Advanced Analytics**: Growth trends, peak period analysis, and performance metrics
+- **Interactive UI**: Clean, responsive interface with visual pattern displays
+- **Real-time Data**: Live sales tracking using official Envato API
+- **Historical Insights**: Track sales patterns across different time periods
+- **GMT+7 Timezone**: Perfect for Asian market analysis and sales timing optimization
 - **Manual Scanning**: Trigger scans manually via the web interface
-- **Database Storage**: SQLite database for storing historical sales data
+- **Database Storage**: SQLite database for storing comprehensive historical data
 
 ## Tech Stack
 
@@ -67,7 +74,7 @@ export const TRACKED_ITEMS = [
    - `DATABASE_URL`: Your database connection string
 4. Deploy!
 
-**Note**: The automated cron job may not work on Vercel's free tier due to serverless function limitations. Consider using Vercel Cron Jobs or external cron services.
+**Note**: The automated hourly cron job may not work on Vercel's free tier due to serverless function limitations. Consider using Vercel Cron Jobs or external cron services.
 
 ### Heroku
 
@@ -89,9 +96,15 @@ export const TRACKED_ITEMS = [
 
 ## API Endpoints
 
-- `GET /api/items` - Fetch all tracked items with sales data
-- `POST /api/scan` - Trigger a manual scan of all items
-- `POST /api/cron/start` - Start the automated cron job
+### Core Endpoints
+- `GET /api/items` - Fetch all tracked items with current sales data
+- `POST /api/scan` - Trigger a manual scan of all tracked items
+- `POST /api/cron/start` - Start the automated hourly cron job
+
+### Analytics Endpoints  
+- `GET /api/analytics/daily?days=30` - Daily analytics with hourly breakdown (0-24h)
+- `GET /api/analytics/weekly?days=90` - Weekly analytics with daily breakdown (Mon-Sun)
+- `GET /api/analytics/monthly?days=365` - Monthly analytics with monthly breakdown (Jan-Dec)
 
 ## Database Schema
 
