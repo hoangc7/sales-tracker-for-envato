@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/**": {
+      "maxDuration": 300
+    }
+  },
+  "env": {
+    "DATABASE_URL": "@database_url"
+  }
+}

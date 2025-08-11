@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ThemeForest Sales Tracker
+
+A Next.js web application that automatically tracks and monitors sales data from ThemeForest items. The app scrapes item pages daily and provides a dashboard to view sales trends and statistics.
+
+## Features
+
+- **Automated Daily Scanning**: Runs at midnight UTC to collect sales data
+- **Dashboard Interface**: Clean, responsive UI built with TailwindCSS
+- **Sales Analytics**: Track daily and weekly sales trends
+- **Manual Scanning**: Trigger scans manually via the web interface
+- **Database Storage**: SQLite database for storing historical sales data
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TailwindCSS
+- **Backend**: Next.js API routes
+- **Database**: SQLite with Prisma ORM
+- **API Integration**: Envato API for fast and reliable data fetching
+- **Scheduling**: node-cron for automated scanning
 
 ## Getting Started
 
-First, run the development server:
+### Local Development
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up the database:
+   ```bash
+   npm run db:push
+   ```
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+### Adding Items to Track
+
+Edit `/src/config/items.ts` to add your ThemeForest items:
+
+```typescript
+export const TRACKED_ITEMS = [
+  {
+    name: "Your Item Name",
+    envatoId: "1234567", // Extract from the ThemeForest URL
+    url: "https://themeforest.net/item/your-item/1234567",
+  },
+  // Add more items...
+];
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Note**: The `envatoId` is the number at the end of the ThemeForest URL.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Vercel (Recommended)
 
-## Learn More
+1. Push your code to a Git repository
+2. Connect your repository to [Vercel](https://vercel.com)
+3. Set environment variables in Vercel dashboard:
+   - `DATABASE_URL`: Your database connection string
+4. Deploy!
 
-To learn more about Next.js, take a look at the following resources:
+**Note**: The automated cron job may not work on Vercel's free tier due to serverless function limitations. Consider using Vercel Cron Jobs or external cron services.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Heroku
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Create a new Heroku app
+2. Add the Heroku Postgres add-on (or use SQLite)
+3. Set environment variables:
+   ```bash
+   heroku config:set DATABASE_URL="your_database_url"
+   ```
+4. Deploy via Git:
+   ```bash
+   git push heroku main
+   ```
 
-## Deploy on Vercel
+## Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `DATABASE_URL`: Database connection string (required)
+- `ENVATO_API_TOKEN`: Optional Envato API token for higher rate limits (get one from [Envato API](https://build.envato.com/api/))
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API Endpoints
+
+- `GET /api/items` - Fetch all tracked items with sales data
+- `POST /api/scan` - Trigger a manual scan of all items
+- `POST /api/cron/start` - Start the automated cron job
+
+## Database Schema
+
+- **Items**: Stores ThemeForest item information
+- **SalesRecords**: Historical sales data with timestamps
+
+## License
+
+MIT
