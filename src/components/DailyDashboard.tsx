@@ -23,20 +23,15 @@ interface DailyItemData {
   growth: number;
 }
 
-interface DailyDashboardProps {
-  days?: number;
-}
-
-export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
+export function DailyDashboard() {
   const [items, setItems] = useState<DailyItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDays] = useState(days);
 
   const fetchDailyData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/analytics/daily?days=${selectedDays}`);
+      const response = await fetch('/api/analytics/daily');
       if (!response.ok) {
         throw new Error('Failed to fetch daily analytics');
       }
@@ -48,7 +43,7 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [selectedDays]);
+  }, []);
 
   useEffect(() => {
     fetchDailyData();
@@ -69,7 +64,7 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
         hourTotals[hourData.hour] += hourData.sales;
       });
     });
-    
+
     const maxSales = Math.max(...hourTotals);
     const mostActiveHour = hourTotals.indexOf(maxSales);
     return mostActiveHour;
@@ -109,7 +104,7 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
           <p className="text-gray-600">24-hour sales breakdown for detailed timing analysis</p>
         </div>
         <div className="text-sm text-gray-500">
-          Data from last {selectedDays} days
+          Data for <span className="font-semibold">today</span> ({new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })})
         </div>
       </div>
 
@@ -155,8 +150,8 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
                 </th>
                 {/* 24 Hour Columns */}
                 {Array.from({ length: 24 }, (_, hour) => (
-                  <th 
-                    key={hour} 
+                  <th
+                    key={hour}
                     className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[50px]"
                     title={`${formatHour(hour)} GMT+7`}
                   >
@@ -172,9 +167,9 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
                 item.hourlyBreakdown.forEach(hourData => {
                   hourlySales[hourData.hour] = hourData.sales;
                 });
-                
+
                 const maxHourlySales = Math.max(...hourlySales);
-                
+
                 return (
                   <tr key={item.id} className={index === 0 ? 'bg-yellow-50' : 'hover:bg-gray-50'}>
                     {/* Item Column - Sticky */}
@@ -188,7 +183,7 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
                             </span>
                           )}
                         </div>
-                        
+
                         {/* Additional Information */}
                         <div className="mt-2 space-y-1 text-xs text-gray-600">
                           {item.author && (
@@ -209,10 +204,10 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
                             })}</div>
                           )}
                         </div>
-                        
-                        <a 
-                          href={item.url} 
-                          target="_blank" 
+
+                        <a
+                          href={item.url}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-blue-600 hover:text-blue-800 mt-2"
                         >
@@ -220,26 +215,26 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
                         </a>
                       </div>
                     </td>
-                    
+
                     {/* Total Sales Column */}
                     <td className="px-4 py-4 text-center bg-blue-50">
                       <span className="text-sm font-bold text-green-600">
                         {formatNumber(item.totalDailySales)}
                       </span>
                     </td>
-                    
+
                     {/* 24 Hour Columns */}
                     {hourlySales.map((sales, hour) => {
                       const intensity = maxHourlySales > 0 ? (sales / maxHourlySales) : 0;
                       const bgColor = sales > 0 ? `rgba(34, 197, 94, ${0.1 + intensity * 0.8})` : 'transparent';
-                      
+
                       return (
-                        <td 
-                          key={hour} 
+                        <td
+                          key={hour}
                           className="px-3 py-4 text-center"
                           title={`${formatHour(hour)}: ${sales} sales`}
                         >
-                          <div 
+                          <div
                             className="h-8 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
@@ -259,7 +254,7 @@ export function DailyDashboard({ days = 30 }: DailyDashboardProps) {
           </table>
         </div>
       </div>
-      
+
       {/* Legend */}
       <div className="bg-gray-50 rounded-lg p-4">
         <div className="flex items-center justify-between text-sm text-gray-600">
