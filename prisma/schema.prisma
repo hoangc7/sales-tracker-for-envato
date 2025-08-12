@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Item {
@@ -30,7 +31,7 @@ model SalesRecord {
   salesCount  Int
   price       Float?
   scannedAt   DateTime @default(now())
-  
+
   item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@map("sales_records")

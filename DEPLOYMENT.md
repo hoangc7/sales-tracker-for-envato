@@ -40,11 +40,12 @@ In Vercel Dashboard → Project → Settings → Environment Variables:
 
 #### Required Variables:
 ```bash
-DATABASE_URL=file:./dev.db
+DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:6543/postgres?pgbouncer=true
+DIRECT_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
 ENVATO_API_TOKEN=your_envato_token_here
 ```
 
-**Note**: For production, consider using a cloud database (PlanetScale, Railway, etc.) instead of SQLite.
+**Note**: Get your Supabase connection strings from: Project Settings → Database → Connection string → Prisma
 
 ### 4. Deploy
 
@@ -114,7 +115,8 @@ To test immediately:
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `DATABASE_URL` | Yes | Database connection string | `file:./dev.db` |
+| `DATABASE_URL` | Yes | Supabase connection string (pooled) | `postgresql://postgres:[PASSWORD]@...` |
+| `DIRECT_URL` | Yes | Supabase direct connection string | `postgresql://postgres.[PROJECT-REF]:...` |
 | `ENVATO_API_TOKEN` | No | Envato API token for higher limits | `your_token_here` |
 
 ### GitHub Secrets
@@ -123,27 +125,28 @@ To test immediately:
 |--------|----------|-------------|---------|
 | `VERCEL_URL` | Yes | Your Vercel app URL | `https://sales-tracker.vercel.app` |
 
-## Database Considerations
+## Database Setup
 
-### SQLite (Default)
-- ✅ Easy setup, no external dependencies
-- ✅ Perfect for small to medium data
-- ❌ Limited concurrent connections
-- ❌ No automatic backups
+### Supabase PostgreSQL (Current Setup)
+- ✅ Free tier with 500MB storage
+- ✅ Automatic backups and scaling
+- ✅ Real-time features available
+- ✅ Built-in authentication and APIs
 
-### Cloud Database (Recommended for Production)
-Consider upgrading to:
-- **PlanetScale** (MySQL)
-- **Railway PostgreSQL**
-- **Supabase PostgreSQL**
+### Setup Instructions:
+1. Create account at [supabase.com](https://supabase.com)
+2. Create new project
+3. Go to Settings → Database
+4. Copy connection strings for Prisma
+5. Use `DATABASE_URL` (pooled) and `DIRECT_URL` (direct connection)
 
-Update `DATABASE_URL` accordingly:
+### Connection String Format:
 ```bash
-# PostgreSQL example
-DATABASE_URL="postgresql://user:password@host:5432/database"
+# Pooled connection (for serverless)
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:6543/postgres?pgbouncer=true"
 
-# MySQL example
-DATABASE_URL="mysql://user:password@host:3306/database"
+# Direct connection (for migrations)
+DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 ```
 
 ## Verification
@@ -194,9 +197,9 @@ Expected response:
 #### 3. Database Connection Issues
 **Symptoms**: "Database connection failed" errors
 **Solutions**:
-- Verify `DATABASE_URL` in Vercel environment variables
-- For cloud databases, check connection string format
-- Ensure database allows connections from Vercel IPs
+- Verify both `DATABASE_URL` and `DIRECT_URL` in Vercel environment variables
+- Check Supabase connection strings include correct password and project ref
+- Ensure Supabase project is not paused (free tier auto-pauses after 1 week inactivity)
 
 #### 4. Missing Sales Data
 **Symptoms**: App loads but shows no sales data
