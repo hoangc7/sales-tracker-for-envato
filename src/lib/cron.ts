@@ -3,10 +3,28 @@ import { ScannerService } from './scanner';
 
 let cronJob: cron.ScheduledTask | null = null;
 
+// Global status tracking
+declare global {
+  var cronJobStatus: {
+    isRunning: boolean;
+    startedAt: string | null;
+    lastRun: string | null;
+  };
+}
+
 export function startCronJob() {
   if (cronJob) {
     console.log('Cron job is already running');
     return;
+  }
+
+  // Initialize global status
+  if (!global.cronJobStatus) {
+    global.cronJobStatus = {
+      isRunning: false,
+      startedAt: null,
+      lastRun: null
+    };
   }
 
   // Run every hour on the hour in GMT+7 timezone
@@ -22,6 +40,8 @@ export function startCronJob() {
       hour12: false
     }).format(now);
     
+    global.cronJobStatus.lastRun = now.toISOString();
+    
     console.log(`Starting scheduled hourly scan at ${gmt7Time} GMT+7...`);
     try {
       const scanner = new ScannerService();
@@ -34,6 +54,9 @@ export function startCronJob() {
     timezone: 'Asia/Bangkok' // GMT+7
   });
 
+  global.cronJobStatus.isRunning = true;
+  global.cronJobStatus.startedAt = new Date().toISOString();
+
   console.log('Cron job started: Hourly scan in GMT+7 timezone');
 }
 
@@ -41,6 +64,11 @@ export function stopCronJob() {
   if (cronJob) {
     cronJob.destroy();
     cronJob = null;
+    
+    if (global.cronJobStatus) {
+      global.cronJobStatus.isRunning = false;
+    }
+    
     console.log('Cron job stopped');
   }
 }
