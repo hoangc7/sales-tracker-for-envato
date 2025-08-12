@@ -13,13 +13,9 @@ export async function GET(request: Request) {
     const dailyView = await Promise.all(items.map(async (item) => {
       const salesHistory = await db.getSalesHistory(item.id, days);
       
-      // Initialize 24 hours (0-23) with zero sales
-      const hourlyBreakdown = Array.from({ length: 24 }, (_, hour) => ({
-        hour,
-        sales: 0
-      }));
+      // Calculate hourly sales from history - only for hours with data
+      const hourlyData = new Map<number, number>();
       
-      // Calculate hourly sales from history
       for (let i = 0; i < salesHistory.length - 1; i++) {
         const current = salesHistory[i];
         const previous = salesHistory[i + 1];
@@ -34,15 +30,22 @@ export async function GET(request: Request) {
         
         const hourIndex = parseInt(hour);
         if (hourIndex >= 0 && hourIndex < 24) {
-          hourlyBreakdown[hourIndex].sales += hourlySales;
+          hourlyData.set(hourIndex, (hourlyData.get(hourIndex) || 0) + hourlySales);
         }
       }
       
+      // Convert to array format, only including hours with recorded data
+      const hourlyBreakdown = Array.from(hourlyData.entries()).map(([hour, sales]) => ({
+        hour,
+        sales
+      }));
+      
       // Calculate totals and peak hour
       const totalDailySales = hourlyBreakdown.reduce((sum, hour) => sum + hour.sales, 0);
-      const peakHour = hourlyBreakdown.reduce((peak, hour, index) => 
-        hour.sales > hourlyBreakdown[peak].sales ? index : peak, 0);
-      const peakHourSales = hourlyBreakdown[peakHour].sales;
+      const peakHourData = hourlyBreakdown.reduce((peak, hour) => 
+        hour.sales > peak.sales ? hour : peak, { hour: 0, sales: 0 });
+      const peakHour = peakHourData.hour;
+      const peakHourSales = peakHourData.sales;
       
       // Calculate growth (simple comparison of recent vs previous periods)
       const recentSales = salesHistory.slice(0, Math.floor(salesHistory.length / 2))

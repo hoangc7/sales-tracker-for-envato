@@ -238,7 +238,7 @@ export function DailyDashboard() {
                             className="h-8 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
-                            {sales > 0 && (
+                            {item.hourlyBreakdown.find(h => h.hour === hour) && (
                               <span className={intensity > 0.5 ? 'text-white' : 'text-gray-700'}>
                                 {sales}
                               </span>
