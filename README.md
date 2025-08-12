@@ -23,7 +23,7 @@ A Next.js web application that automatically tracks and monitors sales data from
 - **Backend**: Next.js API routes
 - **Database**: SQLite with Prisma ORM
 - **API Integration**: Envato API for fast and reliable data fetching
-- **Scheduling**: node-cron for automated scanning
+- **Scheduling**: GitHub Actions for automated hourly scanning
 
 ## Getting Started
 
@@ -74,7 +74,7 @@ export const TRACKED_ITEMS = [
    - `DATABASE_URL`: Your database connection string
 4. Deploy!
 
-**Note**: The automated hourly cron job may not work on Vercel's free tier due to serverless function limitations. Consider using Vercel Cron Jobs or external cron services.
+**Note**: Automated hourly scanning is handled by GitHub Actions, which triggers the `/api/scan` endpoint every hour. This works reliably with Vercel deployments.
 
 ### Heroku
 
@@ -99,7 +99,6 @@ export const TRACKED_ITEMS = [
 ### Core Endpoints
 - `GET /api/items` - Fetch all tracked items with current sales data
 - `POST /api/scan` - Trigger a manual scan of all tracked items
-- `POST /api/cron/start` - Start the automated hourly cron job
 
 ### Analytics Endpoints  
 - `GET /api/analytics/daily?days=30` - Daily analytics with hourly breakdown (0-24h)
