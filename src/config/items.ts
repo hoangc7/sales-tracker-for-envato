@@ -1,27 +1,47 @@
 export const TRACKED_ITEMS = [
   {
-    name: "BeTheme",
-    envatoId: "7758048",
-    url: "https://themeforest.net/item/betheme-responsive-multipurpose-wordpress-theme/7758048",
+    name: "Glozin",
+    envatoId: "58890764",
+    url: "https://themeforest.net/item/glozin-multipurpose-woocommerce-wordpress-theme/58890764",
   },
   {
-    name: "Avada",
-    envatoId: "2833226", 
-    url: "https://themeforest.net/item/avada-responsive-multipurpose-theme/2833226",
+    name: "WoodMart",
+    envatoId: "20264492",
+    url: "https://themeforest.net/item/woodmart-woocommerce-wordpress-theme/20264492",
   },
   {
-    name: "X Theme",
-    envatoId: "5871901",
-    url: "https://themeforest.net/item/x-theme/5871901",
+    name: "Flatsome",
+    envatoId: "5484319",
+    url: "https://themeforest.net/item/flatsome-multipurpose-responsive-woocommerce-theme/5484319",
   },
   {
-    name: "The7",
-    envatoId: "5556590",
-    url: "https://themeforest.net/item/the7-responsive-multipurpose-wordpress-theme/5556590",
+    name: "Porto",
+    envatoId: "9207399",
+    url: "https://themeforest.net/item/porto-responsive-wordpress-ecommerce-theme/9207399",
   },
   {
-    name: "Enfold",
-    envatoId: "4519990",
-    url: "https://themeforest.net/item/enfold-responsive-multipurpose-theme/4519990",
+    name: "XStore",
+    envatoId: "15780546",
+    url: "https://themeforest.net/item/xstore-responsive-woocommerce-theme/15780546",
+  },
+  {
+    name: "Blonwe",
+    envatoId: "48378751",
+    url: "https://themeforest.net/item/blonwe-multipurpose-woocommerce-theme/48378751",
+  },
+  {
+    name: "Sober",
+    envatoId: "18332889",
+    url: "https://themeforest.net/item/sober-woocommerce-wordpress-theme/18332889",
+  },
+  {
+	name: "Konte",
+	envatoId: "23162599",
+	url: "https://themeforest.net/item/konte-minimal-modern-woocommerce-wordpress-theme/23162599",
+  },
+  {
+	name: "Motta",
+	envatoId: "47722442",
+	url: "https://themeforest.net/item/motta-multivendor-and-marketplace-wordpress-theme/47722442",
   },
 ];

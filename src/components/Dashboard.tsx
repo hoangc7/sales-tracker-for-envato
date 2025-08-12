@@ -8,6 +8,7 @@ import { DashboardNavigation, DashboardView } from './DashboardNavigation';
 import { DailyDashboard } from './DailyDashboard';
 import { WeeklyDashboard } from './WeeklyDashboard';
 import { MonthlyDashboard } from './MonthlyDashboard';
+import { ScanButton } from './ScanButton';
 
 type ViewMode = 'table' | 'cards';
 
@@ -183,9 +184,14 @@ export function Dashboard() {
       {/* Main Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">ThemeForest Sales Tracker</h1>
-            <p className="text-gray-600 mt-2">Comprehensive sales analytics and monitoring</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">ThemeForest Sales Tracker</h1>
+              <p className="text-gray-600 mt-2">Comprehensive sales analytics and monitoring</p>
+            </div>
+            {process.env.NODE_ENV === 'development' && (
+              <ScanButton onScanComplete={fetchItems} />
+            )}
           </div>
         </div>
       </div>
