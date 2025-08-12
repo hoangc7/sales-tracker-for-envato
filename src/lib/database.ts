@@ -93,4 +93,16 @@ export class DatabaseService {
 
     return dailySales;
   }
+
+  async deleteItem(itemId: string) {
+    // Delete all sales records first (due to foreign key constraint)
+    await prisma.salesRecord.deleteMany({
+      where: { itemId },
+    });
+    
+    // Then delete the item
+    return prisma.item.delete({
+      where: { id: itemId },
+    });
+  }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
+import { TRACKED_ITEMS } from '@/config/items';
 
 export async function GET(request: Request) {
   try {
@@ -7,7 +8,11 @@ export async function GET(request: Request) {
     const days = parseInt(searchParams.get('days') || '365'); // Default to 365 days for monthly view
     
     const db = new DatabaseService();
-    const items = await db.getAllItems();
+    const allItems = await db.getAllItems();
+    
+    // Filter items to only show those in current config
+    const configUrls = TRACKED_ITEMS.map(item => item.url);
+    const items = allItems.filter(item => configUrls.includes(item.url));
     
     // Generate monthly breakdown data for each item
     const monthlyView = await Promise.all(items.map(async (item) => {
