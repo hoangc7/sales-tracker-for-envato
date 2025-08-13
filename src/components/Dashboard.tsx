@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ItemTable } from './ItemTable';
 import { ItemCard } from './ItemCard';
 import { ViewToggle } from './ViewToggle';
@@ -74,7 +74,7 @@ export function Dashboard() {
     });
   };
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/items');
@@ -82,6 +82,11 @@ export function Dashboard() {
         throw new Error(`Failed to fetch items: ${response.status}`);
       }
       const data = await response.json();
+      
+      // Handle API error response
+      if (data.error) {
+        throw new Error(data.error);
+      }
       
       // Check if we need to auto-scan
       if (shouldAutoScan(data)) {
@@ -100,11 +105,12 @@ export function Dashboard() {
       
       setError(null);
     } catch (err) {
+      console.error('Dashboard fetch error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchItems();
