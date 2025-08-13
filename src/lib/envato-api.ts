@@ -82,13 +82,16 @@ export class EnvatoApiClient {
       
       return data;
     } catch (error) {
-      if (error.name === 'TimeoutError') {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      
+      if (errorName === 'TimeoutError') {
         console.error(`✗ Timeout fetching item ${itemId}`);
         throw new Error(`Request timeout for item ${itemId}`);
       }
       
-      console.error(`✗ Error fetching item ${itemId}:`, error);
-      throw error;
+      console.error(`✗ Error fetching item ${itemId}:`, errorMessage);
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 

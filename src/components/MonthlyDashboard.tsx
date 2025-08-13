@@ -82,9 +82,8 @@ export function MonthlyDashboard() {
     return 'text-gray-600';
   };
 
-  const formatMonthRange = (monthStart: string, monthEnd: string) => {
+  const formatMonthRange = (monthStart: string) => {
     const start = new Date(monthStart);
-    const end = new Date(monthEnd);
 
     return start.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -130,7 +129,7 @@ export function MonthlyDashboard() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Monthly Sales Analytics</h2>
           <p className="text-gray-600">
-            {getMonthTitle()} • {items && items.length > 0 && formatMonthRange(items[0].monthStart, items[0].monthEnd)}
+            {getMonthTitle()} • {items && items.length > 0 && formatMonthRange(items[0].monthStart)}
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -7,14 +7,14 @@ interface CacheEntry<T> {
 }
 
 interface CacheStore {
-  [key: string]: CacheEntry<any>;
+  [key: string]: CacheEntry<unknown>;
 }
 
 // Global cache store
 const globalCache: CacheStore = {};
 
 // Global fetch promises to prevent duplicate requests
-const globalFetchPromises: { [key: string]: Promise<any> } = {};
+const globalFetchPromises: { [key: string]: Promise<unknown> } = {};
 
 // Get next hour timestamp (next :00 minute)
 const getNextHourTimestamp = (): number => {
@@ -25,13 +25,13 @@ const getNextHourTimestamp = (): number => {
 };
 
 // Check if cache entry is still valid
-const isCacheValid = (entry: CacheEntry<any>): boolean => {
+const isCacheValid = (entry: CacheEntry<unknown>): boolean => {
   return Date.now() < entry.expiresAt;
 };
 
 export function useCachedAPI<T>(
   url: string,
-  dependencies: any[] = [],
+  dependencies: unknown[] = [],
   enabled: boolean = true
 ) {
   const [data, setData] = useState<T | null>(null);
@@ -53,19 +53,19 @@ export function useCachedAPI<T>(
       const cachedEntry = globalCache[cacheKey];
       if (!force && cachedEntry && isCacheValid(cachedEntry)) {
         console.log(`Cache hit for ${url}`, cachedEntry.data);
-        setData(cachedEntry.data);
+        setData(cachedEntry.data as T);
         setLoading(false);
         setError(null);
         return;
       }
 
       // Check if there's already a pending request for this URL
-      if (globalFetchPromises[cacheKey]) {
+      if (cacheKey in globalFetchPromises) {
         console.log(`Request already in progress for ${url}, waiting for result...`);
         try {
           const result = await globalFetchPromises[cacheKey];
           console.log(`Got result from shared request for ${url}:`, result);
-          setData(result);
+          setData(result as T);
           setLoading(false);
           setError(null);
           return;
@@ -108,7 +108,7 @@ export function useCachedAPI<T>(
 
         console.log(`Setting data and cached ${url} until ${new Date(getNextHourTimestamp()).toLocaleTimeString()}`);
         
-        setData(result);
+        setData(result as T);
         setError(null);
         setLoading(false);
       } catch (err) {
