@@ -22,22 +22,20 @@ interface WeeklyItemData {
   peakDay: number; // Day with most sales (0-6)
   peakDaySales: number;
   growth: number;
+  weekStart: string;
+  weekEnd: string;
 }
 
-interface WeeklyDashboardProps {
-  days?: number;
-}
-
-export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
+export function WeeklyDashboard() {
   const [items, setItems] = useState<WeeklyItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDays, setSelectedDays] = useState(days);
+  const [weeksAgo, setWeeksAgo] = useState(0); // 0 = current week, 1 = last week, etc.
 
   const fetchWeeklyData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/analytics/weekly?days=${selectedDays}`);
+      const response = await fetch(`/api/analytics/weekly?weeksAgo=${weeksAgo}`);
       if (!response.ok) {
         throw new Error('Failed to fetch weekly analytics');
       }
@@ -49,7 +47,7 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [selectedDays]);
+  }, [weeksAgo]);
 
   useEffect(() => {
     fetchWeeklyData();
@@ -68,7 +66,7 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
         dayTotals[dayData.day] += dayData.sales;
       });
     });
-    
+
     const maxSales = Math.max(...dayTotals);
     const mostActiveDay = dayTotals.indexOf(maxSales);
     return getDayNames()[mostActiveDay];
@@ -79,6 +77,33 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
     if (growth < 0) return 'text-red-600';
     return 'text-gray-600';
   };
+
+  const formatWeekRange = (weekStart: string, weekEnd: string) => {
+    const start = new Date(weekStart);
+    const end = new Date(weekEnd);
+
+    const startStr = start.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+    const endStr = end.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    return `${startStr} - ${endStr}`;
+  };
+
+  const getWeekTitle = () => {
+    if (weeksAgo === 0) return 'This Week';
+    if (weeksAgo === 1) return 'Last Week';
+    return `${weeksAgo} Weeks Ago`;
+  };
+
+  const goToPreviousWeek = () => setWeeksAgo(prev => prev + 1);
+  const goToNextWeek = () => setWeeksAgo(prev => Math.max(0, prev - 1));
+  const goToCurrentWeek = () => setWeeksAgo(0);
 
   if (loading) {
     return (
@@ -100,26 +125,43 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters */}
+      {/* Header with navigation */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Weekly Sales Analytics</h2>
-          <p className="text-gray-600">7-day sales breakdown for weekly pattern analysis</p>
+          <p className="text-gray-600">
+            {getWeekTitle()} • {items.length > 0 && formatWeekRange(items[0].weekStart, items[0].weekEnd)}
+          </p>
         </div>
-        <div className="flex gap-2">
-          {[30, 60, 90, 180].map(dayOption => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goToPreviousWeek}
+            className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            title="Previous week"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={goToNextWeek}
+            disabled={weeksAgo === 0}
+            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              weeksAgo === 0
+                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title="Next week"
+          >
+            Next →
+          </button>
+          {weeksAgo > 0 && (
             <button
-              key={dayOption}
-              onClick={() => setSelectedDays(dayOption)}
-              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                selectedDays === dayOption
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              onClick={goToCurrentWeek}
+              className="px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              title="Go to current week"
             >
-              {dayOption}D
+              This Week
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -165,8 +207,8 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
                 </th>
                 {/* 7 Day Columns (Mon-Sun) */}
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName, index) => (
-                  <th 
-                    key={index} 
+                  <th
+                    key={index}
                     className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]"
                     title={`${dayName} sales`}
                   >
@@ -181,16 +223,16 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
                 // Reorder to Mon-Sun display order
                 const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
                 const dailySales = new Array(7).fill(0);
-                
+
                 item.dailyBreakdown.forEach(dayData => {
                   const displayIndex = dayOrder.indexOf(dayData.day);
                   if (displayIndex !== -1) {
                     dailySales[displayIndex] = dayData.sales;
                   }
                 });
-                
+
                 const maxDailySales = Math.max(...dailySales);
-                
+
                 return (
                   <tr key={item.id} className={index === 0 ? 'bg-green-50' : 'hover:bg-gray-50'}>
                     {/* Item Column - Sticky */}
@@ -204,7 +246,7 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
                             </span>
                           )}
                         </div>
-                        
+
                         {/* Additional Information */}
                         <div className="mt-2 space-y-1 text-xs text-gray-600">
                           {item.author && (
@@ -225,10 +267,10 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
                             })}</div>
                           )}
                         </div>
-                        
-                        <a 
-                          href={item.url} 
-                          target="_blank" 
+
+                        <a
+                          href={item.url}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-blue-600 hover:text-blue-800 mt-2"
                         >
@@ -236,27 +278,27 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
                         </a>
                       </div>
                     </td>
-                    
+
                     {/* Total Sales Column */}
                     <td className="px-4 py-4 text-center bg-blue-50">
                       <span className="text-sm font-bold text-green-600">
                         {formatNumber(item.totalWeeklySales)}
                       </span>
                     </td>
-                    
+
                     {/* 7 Day Columns */}
                     {dailySales.map((sales, dayIndex) => {
                       const intensity = maxDailySales > 0 ? (sales / maxDailySales) : 0;
                       const bgColor = sales > 0 ? `rgba(59, 130, 246, ${0.1 + intensity * 0.8})` : 'transparent';
                       const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                      
+
                       return (
-                        <td 
-                          key={dayIndex} 
+                        <td
+                          key={dayIndex}
                           className="px-4 py-4 text-center"
                           title={`${dayNames[dayIndex]}: ${sales} sales`}
                         >
-                          <div 
+                          <div
                             className="h-10 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
@@ -276,7 +318,7 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
           </table>
         </div>
       </div>
-      
+
       {/* Legend */}
       <div className="bg-gray-50 rounded-lg p-4">
         <div className="flex items-center justify-between text-sm text-gray-600">
@@ -286,7 +328,7 @@ export function WeeklyDashboard({ days = 90 }: WeeklyDashboardProps) {
             <span>Days ordered Mon-Sun</span>
           </div>
           <div className="text-xs text-gray-500">
-            Hover over day cells for details • Data from last {selectedDays} days
+            Hover over day cells for details • {getWeekTitle()} sales data
           </div>
         </div>
       </div>

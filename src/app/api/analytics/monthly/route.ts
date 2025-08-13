@@ -5,51 +5,62 @@ import { TRACKED_ITEMS } from '@/config/items';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const days = parseInt(searchParams.get('days') || '365'); // Default to 365 days for monthly view
-    
+    const monthsAgo = parseInt(searchParams.get('monthsAgo') || '0'); // 0 = current month, 1 = last month, etc.
+
+    // Calculate the start and end of the target month
+    const now = new Date();
+    const targetDate = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+
+    const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
     const db = new DatabaseService();
     const allItems = await db.getAllItems();
-    
+
     // Filter items to only show those in current config
     const configUrls = TRACKED_ITEMS.map(item => item.url);
     const items = allItems.filter(item => configUrls.includes(item.url));
-    
-    // Generate monthly breakdown data for each item
+
+    // Generate daily breakdown data for each item (days of the month)
     const monthlyView = await Promise.all(items.map(async (item) => {
-      const salesHistory = await db.getSalesHistory(item.id, days);
-      
-      // Initialize 12 months (0=January, 1=February, ... 11=December) with zero sales
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const monthlyBreakdown = Array.from({ length: 12 }, (_, month) => ({
-        month,
-        monthName: monthNames[month],
+      // Get sales history for a broader range to calculate growth
+      const salesHistory = await db.getSalesHistory(item.id, 90);
+
+      // Get number of days in the target month
+      const daysInMonth = monthEnd.getDate();
+
+      // Initialize daily breakdown for the month (1-based day numbers)
+      const dailyBreakdown = Array.from({ length: daysInMonth }, (_, index) => ({
+        day: index + 1,
         sales: 0
       }));
-      
-      // Calculate monthly sales from history
+
+      // Calculate daily sales from history - only for the target month
       for (let i = 0; i < salesHistory.length - 1; i++) {
         const current = salesHistory[i];
         const previous = salesHistory[i + 1];
-        const monthlySales = Math.max(0, current.salesCount - previous.salesCount);
-        
-        // Get month from timestamp (GMT+7)
-        const month = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'Asia/Bangkok',
-          month: 'numeric'
-        }).format(current.scannedAt);
-        
-        const monthIndex = parseInt(month) - 1; // Convert to 0-based index
-        if (monthIndex >= 0 && monthIndex < 12) {
-          monthlyBreakdown[monthIndex].sales += monthlySales;
+
+        // Check if this record is within our target month
+        if (current.scannedAt >= monthStart && current.scannedAt <= monthEnd) {
+          const dailySales = Math.max(0, current.salesCount - previous.salesCount);
+
+          // Get day of month (1-based)
+          const dayOfMonth = current.scannedAt.getDate();
+          if (dayOfMonth >= 1 && dayOfMonth <= daysInMonth) {
+            dailyBreakdown[dayOfMonth - 1].sales += dailySales;
+          }
         }
       }
-      
-      // Calculate totals and peak month
-      const totalMonthlySales = monthlyBreakdown.reduce((sum, month) => sum + month.sales, 0);
-      const peakMonth = monthlyBreakdown.reduce((peak, month, index) => 
-        month.sales > monthlyBreakdown[peak].sales ? index : peak, 0);
-      const peakMonthSales = monthlyBreakdown[peakMonth].sales;
-      
+
+      // Calculate totals and peak day
+      const totalMonthlySales = dailyBreakdown.reduce((sum, day) => sum + day.sales, 0);
+      const peakDay = dailyBreakdown.reduce((peak, day, index) =>
+        day.sales > dailyBreakdown[peak].sales ? index : peak, 0);
+      const peakDaySales = dailyBreakdown[peakDay].sales;
+
       // Calculate growth (simple comparison of recent vs previous periods)
       const recentSales = salesHistory.slice(0, Math.floor(salesHistory.length / 2))
         .reduce((sum, record, index) => {
@@ -58,7 +69,7 @@ export async function GET(request: Request) {
           }
           return sum;
         }, 0);
-      
+
       const previousSales = salesHistory.slice(Math.floor(salesHistory.length / 2))
         .reduce((sum, record, index) => {
           if (index < salesHistory.length / 2 - 1) {
@@ -69,9 +80,9 @@ export async function GET(request: Request) {
           }
           return sum;
         }, 0);
-      
+
       const growth = previousSales > 0 ? ((recentSales - previousSales) / previousSales) * 100 : 0;
-      
+
       return {
         id: item.id,
         name: item.name,
@@ -81,14 +92,16 @@ export async function GET(request: Request) {
         latestSales: salesHistory[0]?.salesCount || 0,
         latestPrice: salesHistory[0]?.price || undefined,
         lastScanned: salesHistory[0]?.scannedAt?.toISOString(),
-        monthlyBreakdown,
+        dailyBreakdown,
         totalMonthlySales,
-        peakMonth,
-        peakMonthSales,
-        growth
+        peakDay: peakDay + 1, // Convert back to 1-based day
+        peakDaySales,
+        growth,
+        monthStart: monthStart.toISOString(),
+        monthEnd: monthEnd.toISOString()
       };
     }));
-    
+
     return NextResponse.json(monthlyView);
   } catch (error) {
     console.error('Monthly analytics error:', error);

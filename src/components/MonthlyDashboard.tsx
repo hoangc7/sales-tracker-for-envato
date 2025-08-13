@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-interface MonthlyBreakdown {
-  month: number; // 0=January, 1=February, ... 11=December
-  monthName: string;
+interface DailyBreakdown {
+  day: number; // 1-31 (day of month)
   sales: number;
 }
 
@@ -17,27 +16,25 @@ interface MonthlyItemData {
   latestSales: number;
   latestPrice?: number;
   lastScanned?: string;
-  monthlyBreakdown: MonthlyBreakdown[]; // 12 months (Jan-Dec)
+  dailyBreakdown: DailyBreakdown[]; // Days of the month (1-31)
   totalMonthlySales: number;
-  peakMonth: number; // Month with most sales (0-11)
-  peakMonthSales: number;
+  peakDay: number; // Day with most sales (1-31)
+  peakDaySales: number;
   growth: number;
+  monthStart: string;
+  monthEnd: string;
 }
 
-interface MonthlyDashboardProps {
-  days?: number;
-}
-
-export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
+export function MonthlyDashboard() {
   const [items, setItems] = useState<MonthlyItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDays, setSelectedDays] = useState(days);
+  const [monthsAgo, setMonthsAgo] = useState(0); // 0 = current month, 1 = last month, etc.
 
   const fetchMonthlyData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/analytics/monthly?days=${selectedDays}`);
+      const response = await fetch(`/api/analytics/monthly?monthsAgo=${monthsAgo}`);
       if (!response.ok) {
         throw new Error('Failed to fetch monthly analytics');
       }
@@ -49,7 +46,7 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [selectedDays]);
+  }, [monthsAgo]);
 
   useEffect(() => {
     fetchMonthlyData();
@@ -59,19 +56,24 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
     return num.toLocaleString();
   };
 
-  const getMonthNames = () => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  const getMostActiveMonth = (items: MonthlyItemData[]) => {
-    const monthTotals = new Array(12).fill(0);
+  const getMostActiveDay = (items: MonthlyItemData[]) => {
+    const dayTotals = new Map<number, number>();
     items.forEach(item => {
-      item.monthlyBreakdown.forEach(monthData => {
-        monthTotals[monthData.month] += monthData.sales;
+      item.dailyBreakdown.forEach(dayData => {
+        dayTotals.set(dayData.day, (dayTotals.get(dayData.day) || 0) + dayData.sales);
       });
     });
-    
-    const maxSales = Math.max(...monthTotals);
-    const mostActiveMonth = monthTotals.indexOf(maxSales);
-    return getMonthNames()[mostActiveMonth];
+
+    let maxSales = 0;
+    let mostActiveDay = 1;
+    dayTotals.forEach((sales, day) => {
+      if (sales > maxSales) {
+        maxSales = sales;
+        mostActiveDay = day;
+      }
+    });
+
+    return mostActiveDay;
   };
 
   const getGrowthColor = (growth: number) => {
@@ -79,6 +81,26 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
     if (growth < 0) return 'text-red-600';
     return 'text-gray-600';
   };
+
+  const formatMonthRange = (monthStart: string, monthEnd: string) => {
+    const start = new Date(monthStart);
+    const end = new Date(monthEnd);
+
+    return start.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long'
+    });
+  };
+
+  const getMonthTitle = () => {
+    if (monthsAgo === 0) return 'This Month';
+    if (monthsAgo === 1) return 'Last Month';
+    return `${monthsAgo} Months Ago`;
+  };
+
+  const goToPreviousMonth = () => setMonthsAgo(prev => prev + 1);
+  const goToNextMonth = () => setMonthsAgo(prev => Math.max(0, prev - 1));
+  const goToCurrentMonth = () => setMonthsAgo(0);
 
   if (loading) {
     return (
@@ -100,26 +122,43 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters */}
+      {/* Header with navigation */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Monthly Sales Analytics</h2>
-          <p className="text-gray-600">12-month sales breakdown for seasonal pattern analysis</p>
+          <p className="text-gray-600">
+            {getMonthTitle()} • {items.length > 0 && formatMonthRange(items[0].monthStart, items[0].monthEnd)}
+          </p>
         </div>
-        <div className="flex gap-2">
-          {[90, 180, 365, 730].map(dayOption => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goToPreviousMonth}
+            className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            title="Previous month"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={goToNextMonth}
+            disabled={monthsAgo === 0}
+            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              monthsAgo === 0
+                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title="Next month"
+          >
+            Next →
+          </button>
+          {monthsAgo > 0 && (
             <button
-              key={dayOption}
-              onClick={() => setSelectedDays(dayOption)}
-              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                selectedDays === dayOption
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              onClick={goToCurrentMonth}
+              className="px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              title="Go to current month"
             >
-              {dayOption < 365 ? `${dayOption}D` : `${Math.round(dayOption/365)}Y`}
+              This Month
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -130,19 +169,19 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
           <p className="text-2xl font-bold text-gray-900">{items.length}</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-medium text-gray-500">Total Annual Sales</h3>
+          <h3 className="text-sm font-medium text-gray-500">Total Monthly Sales</h3>
           <p className="text-2xl font-bold text-green-600">
             {formatNumber(items.reduce((sum, item) => sum + item.totalMonthlySales, 0))}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-medium text-gray-500">Peak Season</h3>
+          <h3 className="text-sm font-medium text-gray-500">Peak Day</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {getMostActiveMonth(items)}
+            {getMostActiveDay(items)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-medium text-gray-500">Annual Champion</h3>
+          <h3 className="text-sm font-medium text-gray-500">Monthly Leader</h3>
           <p className="text-lg font-bold text-gray-900">
             {sortedItems[0]?.name || 'N/A'}
           </p>
@@ -164,9 +203,9 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
                   Total
                 </th>
                 {/* 12 Month Columns (Jan-Dec) */}
-                {getMonthNames().map((monthName, index) => (
-                  <th 
-                    key={index} 
+                {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((monthName, index) => (
+                  <th
+                    key={index}
                     className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[60px]"
                     title={`${monthName} sales`}
                   >
@@ -177,14 +216,18 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {sortedItems.map((item, index) => {
+                // Get the actual month index from the monthStart date
+                const currentMonthIndex = new Date(item.monthStart).getMonth(); // 0=Jan, 1=Feb, ..., 11=Dec
+
                 // Create array with sales for each month (0=Jan, 1=Feb, ..., 11=Dec)
                 const monthlySales = new Array(12).fill(0);
-                item.monthlyBreakdown.forEach(monthData => {
-                  monthlySales[monthData.month] = monthData.sales;
+                item.dailyBreakdown.forEach(dayData => {
+                  // Put all daily sales into the correct current month
+                  monthlySales[currentMonthIndex] += dayData.sales;
                 });
-                
+
                 const maxMonthlySales = Math.max(...monthlySales);
-                
+
                 return (
                   <tr key={item.id} className={index === 0 ? 'bg-purple-50' : 'hover:bg-gray-50'}>
                     {/* Item Column - Sticky */}
@@ -198,14 +241,14 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
                             </span>
                           )}
                         </div>
-                        
+
                         {/* Additional Information */}
                         <div className="mt-2 space-y-1 text-xs text-gray-600">
                           {item.author && (
                             <div>👤 {item.author}</div>
                           )}
                           <div>💰 ${item.latestPrice?.toFixed(0) || 'N/A'}</div>
-                          <div>🗓️ Peak: {getMonthNames()[item.peakMonth]} ({item.peakMonthSales} sales)</div>
+                          <div>🗓️ Peak: Day {item.peakDay} ({item.peakDaySales} sales)</div>
                           <div className={`${getGrowthColor(item.growth)}`}>
                             📊 Growth: {item.growth > 0 ? '+' : ''}{item.growth.toFixed(1)}%
                           </div>
@@ -219,10 +262,10 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
                             })}</div>
                           )}
                         </div>
-                        
-                        <a 
-                          href={item.url} 
-                          target="_blank" 
+
+                        <a
+                          href={item.url}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-blue-600 hover:text-blue-800 mt-2"
                         >
@@ -230,27 +273,27 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
                         </a>
                       </div>
                     </td>
-                    
+
                     {/* Total Sales Column */}
                     <td className="px-4 py-4 text-center bg-blue-50">
                       <span className="text-sm font-bold text-green-600">
                         {formatNumber(item.totalMonthlySales)}
                       </span>
                     </td>
-                    
+
                     {/* 12 Month Columns */}
                     {monthlySales.map((sales, monthIndex) => {
                       const intensity = maxMonthlySales > 0 ? (sales / maxMonthlySales) : 0;
                       const bgColor = sales > 0 ? `rgba(147, 51, 234, ${0.1 + intensity * 0.8})` : 'transparent';
-                      const monthNames = getMonthNames();
-                      
+                      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
                       return (
-                        <td 
-                          key={monthIndex} 
+                        <td
+                          key={monthIndex}
                           className="px-3 py-4 text-center"
                           title={`${monthNames[monthIndex]}: ${sales} sales`}
                         >
-                          <div 
+                          <div
                             className="h-12 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
@@ -270,7 +313,7 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
           </table>
         </div>
       </div>
-      
+
       {/* Legend */}
       <div className="bg-gray-50 rounded-lg p-4">
         <div className="flex items-center justify-between text-sm text-gray-600">
@@ -278,9 +321,10 @@ export function MonthlyDashboard({ days = 365 }: MonthlyDashboardProps) {
             <span>💡 <strong>Legend:</strong></span>
             <span>Darker purple = More sales in that month</span>
             <span>Months ordered Jan-Dec</span>
+            <span>• Sales shown in {getMonthTitle()} column</span>
           </div>
           <div className="text-xs text-gray-500">
-            Hover over month cells for details • Data from last {selectedDays} days
+            Hover over month cells for details • Navigate to view different months
           </div>
         </div>
       </div>

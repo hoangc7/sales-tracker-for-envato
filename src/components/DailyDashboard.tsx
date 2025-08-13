@@ -21,17 +21,20 @@ interface DailyItemData {
   peakHour: number; // Hour with most sales (0-23)
   peakHourSales: number;
   growth: number;
+  dayStart: string;
+  dayEnd: string;
 }
 
 export function DailyDashboard() {
   const [items, setItems] = useState<DailyItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [daysAgo, setDaysAgo] = useState(0); // 0 = today, 1 = yesterday, etc.
 
   const fetchDailyData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/analytics/daily');
+      const response = await fetch(`/api/analytics/daily?daysAgo=${daysAgo}`);
       if (!response.ok) {
         throw new Error('Failed to fetch daily analytics');
       }
@@ -43,7 +46,7 @@ export function DailyDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [daysAgo]);
 
   useEffect(() => {
     fetchDailyData();
@@ -76,6 +79,26 @@ export function DailyDashboard() {
     return 'text-gray-600';
   };
 
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      weekday: 'short'
+    });
+  };
+
+  const getDayTitle = () => {
+    if (daysAgo === 0) return 'Today';
+    if (daysAgo === 1) return 'Yesterday';
+    return `${daysAgo} Days Ago`;
+  };
+
+  const goToPreviousDay = () => setDaysAgo(prev => prev + 1);
+  const goToNextDay = () => setDaysAgo(prev => Math.max(0, prev - 1));
+  const goToToday = () => setDaysAgo(0);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -97,14 +120,43 @@ export function DailyDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with navigation */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Hourly Sales Analytics</h2>
-          <p className="text-gray-600">24-hour sales breakdown for detailed timing analysis</p>
+          <h2 className="text-2xl font-bold text-gray-900">Daily Sales Analytics</h2>
+          <p className="text-gray-600">
+            {getDayTitle()} • {items.length > 0 && formatDate(items[0].dayStart)}
+          </p>
         </div>
-        <div className="text-sm text-gray-500">
-          Data for <span className="font-semibold">today</span> ({new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })})
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goToPreviousDay}
+            className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            title="Previous day"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={goToNextDay}
+            disabled={daysAgo === 0}
+            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              daysAgo === 0
+                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title="Next day"
+          >
+            Next →
+          </button>
+          {daysAgo > 0 && (
+            <button
+              onClick={goToToday}
+              className="px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              title="Go to today"
+            >
+              Today
+            </button>
+          )}
         </div>
       </div>
 
