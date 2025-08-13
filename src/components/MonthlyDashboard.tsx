@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useOldestDate } from '@/hooks/useOldestDate';
 
 interface DailyBreakdown {
   day: number; // 1-31 (day of month)
@@ -30,6 +31,7 @@ export function MonthlyDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [monthsAgo, setMonthsAgo] = useState(0); // 0 = current month, 1 = last month, etc.
+  const { canGoToPreviousMonth } = useOldestDate();
 
   const fetchMonthlyData = useCallback(async () => {
     try {
@@ -133,8 +135,13 @@ export function MonthlyDashboard() {
         <div className="flex items-center gap-2">
           <button
             onClick={goToPreviousMonth}
-            className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-            title="Previous month"
+            disabled={!canGoToPreviousMonth(monthsAgo)}
+            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              !canGoToPreviousMonth(monthsAgo)
+                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={!canGoToPreviousMonth(monthsAgo) ? "No older data available" : "Previous month"}
           >
             ← Previous
           </button>

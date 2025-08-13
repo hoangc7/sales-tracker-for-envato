@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useOldestDate } from '@/hooks/useOldestDate';
 
 interface DailyBreakdown {
   day: number; // 0=Sunday, 1=Monday, ... 6=Saturday
@@ -31,6 +32,7 @@ export function WeeklyDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weeksAgo, setWeeksAgo] = useState(0); // 0 = current week, 1 = last week, etc.
+  const { canGoToPreviousWeek } = useOldestDate();
 
   const fetchWeeklyData = useCallback(async () => {
     try {
@@ -136,8 +138,13 @@ export function WeeklyDashboard() {
         <div className="flex items-center gap-2">
           <button
             onClick={goToPreviousWeek}
-            className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-            title="Previous week"
+            disabled={!canGoToPreviousWeek(weeksAgo)}
+            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              !canGoToPreviousWeek(weeksAgo)
+                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={!canGoToPreviousWeek(weeksAgo) ? "No older data available" : "Previous week"}
           >
             ← Previous
           </button>

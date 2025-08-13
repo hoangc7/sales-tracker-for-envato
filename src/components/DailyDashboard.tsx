@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useOldestDate } from '@/hooks/useOldestDate';
 
 interface HourlyBreakdown {
   hour: number; // 0-23
@@ -30,6 +31,7 @@ export function DailyDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [daysAgo, setDaysAgo] = useState(0); // 0 = today, 1 = yesterday, etc.
+  const { canGoToPreviousDay } = useOldestDate();
 
   const fetchDailyData = useCallback(async () => {
     try {
@@ -131,8 +133,13 @@ export function DailyDashboard() {
         <div className="flex items-center gap-2">
           <button
             onClick={goToPreviousDay}
-            className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-            title="Previous day"
+            disabled={!canGoToPreviousDay(daysAgo)}
+            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              !canGoToPreviousDay(daysAgo)
+                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={!canGoToPreviousDay(daysAgo) ? "No older data available" : "Previous day"}
           >
             ← Previous
           </button>
