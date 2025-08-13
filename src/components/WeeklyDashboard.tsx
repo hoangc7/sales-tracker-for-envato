@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useOldestDate } from '@/hooks/useOldestDate';
+import { useState, useEffect, useRef } from 'react';
 
 interface DailyBreakdown {
   day: number; // 0=Sunday, 1=Monday, ... 6=Saturday
@@ -32,28 +31,80 @@ export function WeeklyDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weeksAgo, setWeeksAgo] = useState(0); // 0 = current week, 1 = last week, etc.
-  const { canGoToPreviousWeek } = useOldestDate();
+  const [oldestDate, setOldestDate] = useState<Date | null>(null);
+  
+  // Use refs to prevent duplicate API calls in React Strict Mode
+  const oldestDateFetching = useRef(false);
+  const weeklyDataFetching = useRef(false);
+  const currentWeeksAgo = useRef<number | null>(null);
 
-  const fetchWeeklyData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/analytics/weekly?weeksAgo=${weeksAgo}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch weekly analytics');
-      }
-      const data = await response.json();
-      setItems(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+  // Separate effect for fetching oldest date only once
+  useEffect(() => {
+    if (!oldestDateFetching.current && !oldestDate) {
+      oldestDateFetching.current = true;
+      
+      const fetchOldestDate = async () => {
+        try {
+          const response = await fetch('/api/analytics/data-range?type=oldest');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.oldestDate) {
+              setOldestDate(new Date(data.oldestDate));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch oldest date:', err);
+        }
+      };
+
+      fetchOldestDate();
+    }
+  }, [oldestDate]);
+
+  // Separate effect for fetching weekly data
+  useEffect(() => {
+    if (!weeklyDataFetching.current || currentWeeksAgo.current !== weeksAgo) {
+      weeklyDataFetching.current = true;
+      currentWeeksAgo.current = weeksAgo;
+      
+      const fetchWeeklyData = async () => {
+        try {
+          setLoading(true);
+          const response = await fetch(`/api/analytics/weekly?weeksAgo=${weeksAgo}`);
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch weekly analytics');
+          }
+
+          const data = await response.json();
+          setItems(data);
+          setError(null);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+          setLoading(false);
+          weeklyDataFetching.current = false;
+        }
+      };
+
+      fetchWeeklyData();
     }
   }, [weeksAgo]);
 
-  useEffect(() => {
-    fetchWeeklyData();
-  }, [fetchWeeklyData]);
+  const canGoToPreviousWeek = (weeksAgoCheck: number): boolean => {
+    if (!oldestDate) return true; // If we don't know, allow navigation
+
+    const now = new Date();
+    const currentDay = now.getDay();
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+
+    // Calculate Monday of the week we would navigate to
+    const targetMonday = new Date(now);
+    targetMonday.setDate(now.getDate() - daysToMonday - ((weeksAgoCheck + 1) * 7));
+    targetMonday.setHours(0, 0, 0, 0);
+
+    return targetMonday >= oldestDate;
+  };
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();

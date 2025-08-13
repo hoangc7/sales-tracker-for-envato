@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useOldestDate } from '@/hooks/useOldestDate';
+import { useState, useEffect, useRef } from 'react';
 
 interface DailyBreakdown {
   day: number; // 1-31 (day of month)
@@ -31,28 +30,74 @@ export function MonthlyDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [monthsAgo, setMonthsAgo] = useState(0); // 0 = current month, 1 = last month, etc.
-  const { canGoToPreviousMonth } = useOldestDate();
+  const [oldestDate, setOldestDate] = useState<Date | null>(null);
+  
+  // Use refs to prevent duplicate API calls in React Strict Mode
+  const oldestDateFetching = useRef(false);
+  const monthlyDataFetching = useRef(false);
+  const currentMonthsAgo = useRef<number | null>(null);
 
-  const fetchMonthlyData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/analytics/monthly?monthsAgo=${monthsAgo}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch monthly analytics');
-      }
-      const data = await response.json();
-      setItems(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+  // Separate effect for fetching oldest date only once
+  useEffect(() => {
+    if (!oldestDateFetching.current && !oldestDate) {
+      oldestDateFetching.current = true;
+      
+      const fetchOldestDate = async () => {
+        try {
+          const response = await fetch('/api/analytics/data-range?type=oldest');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.oldestDate) {
+              setOldestDate(new Date(data.oldestDate));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch oldest date:', err);
+        }
+      };
+
+      fetchOldestDate();
+    }
+  }, [oldestDate]);
+
+  // Separate effect for fetching monthly data
+  useEffect(() => {
+    if (!monthlyDataFetching.current || currentMonthsAgo.current !== monthsAgo) {
+      monthlyDataFetching.current = true;
+      currentMonthsAgo.current = monthsAgo;
+      
+      const fetchMonthlyData = async () => {
+        try {
+          setLoading(true);
+          const response = await fetch(`/api/analytics/monthly?monthsAgo=${monthsAgo}`);
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch monthly analytics');
+          }
+
+          const data = await response.json();
+          setItems(data);
+          setError(null);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+          setLoading(false);
+          monthlyDataFetching.current = false;
+        }
+      };
+
+      fetchMonthlyData();
     }
   }, [monthsAgo]);
 
-  useEffect(() => {
-    fetchMonthlyData();
-  }, [fetchMonthlyData]);
+  const canGoToPreviousMonth = (monthsAgoCheck: number): boolean => {
+    if (!oldestDate) return true; // If we don't know, allow navigation
+
+    const now = new Date();
+    const targetDate = new Date(now.getFullYear(), now.getMonth() - (monthsAgoCheck + 1), 1);
+
+    return targetDate >= oldestDate;
+  };
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
