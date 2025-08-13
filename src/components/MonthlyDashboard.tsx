@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
+import { useCachedAPI } from '@/hooks/useCachedAPI';
 
 interface DailyBreakdown {
   day: number; // 1-31 (day of month)
@@ -26,69 +27,21 @@ interface MonthlyItemData {
 }
 
 export function MonthlyDashboard() {
-  const [items, setItems] = useState<MonthlyItemData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [monthsAgo, setMonthsAgo] = useState(0); // 0 = current month, 1 = last month, etc.
-  const [oldestDate, setOldestDate] = useState<Date | null>(null);
   
-  // Use refs to prevent duplicate API calls in React Strict Mode
-  const oldestDateFetching = useRef(false);
-  const monthlyDataFetching = useRef(false);
-  const currentMonthsAgo = useRef<number | null>(null);
+  // Use cached API calls
+  const { 
+    data: items, 
+    loading, 
+    error 
+  } = useCachedAPI<MonthlyItemData[]>(`/api/analytics/monthly?monthsAgo=${monthsAgo}`, [monthsAgo]);
 
-  // Separate effect for fetching oldest date only once
-  useEffect(() => {
-    if (!oldestDateFetching.current && !oldestDate) {
-      oldestDateFetching.current = true;
-      
-      const fetchOldestDate = async () => {
-        try {
-          const response = await fetch('/api/analytics/data-range?type=oldest');
-          if (response.ok) {
-            const data = await response.json();
-            if (data.oldestDate) {
-              setOldestDate(new Date(data.oldestDate));
-            }
-          }
-        } catch (err) {
-          console.error('Failed to fetch oldest date:', err);
-        }
-      };
+  const { 
+    data: dateRangeData 
+  } = useCachedAPI<{oldestDate?: string}>('/api/analytics/data-range?type=oldest');
 
-      fetchOldestDate();
-    }
-  }, [oldestDate]);
-
-  // Separate effect for fetching monthly data
-  useEffect(() => {
-    if (!monthlyDataFetching.current || currentMonthsAgo.current !== monthsAgo) {
-      monthlyDataFetching.current = true;
-      currentMonthsAgo.current = monthsAgo;
-      
-      const fetchMonthlyData = async () => {
-        try {
-          setLoading(true);
-          const response = await fetch(`/api/analytics/monthly?monthsAgo=${monthsAgo}`);
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch monthly analytics');
-          }
-
-          const data = await response.json();
-          setItems(data);
-          setError(null);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-          setLoading(false);
-          monthlyDataFetching.current = false;
-        }
-      };
-
-      fetchMonthlyData();
-    }
-  }, [monthsAgo]);
+  // Extract oldest date from cached data
+  const oldestDate = dateRangeData?.oldestDate ? new Date(dateRangeData.oldestDate) : null;
 
   const canGoToPreviousMonth = (monthsAgoCheck: number): boolean => {
     if (!oldestDate) return true; // If we don't know, allow navigation
@@ -149,7 +102,7 @@ export function MonthlyDashboard() {
   const goToNextMonth = () => setMonthsAgo(prev => Math.max(0, prev - 1));
   const goToCurrentMonth = () => setMonthsAgo(0);
 
-  if (loading) {
+  if (loading || !items) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-lg">Loading monthly breakdown...</div>
@@ -165,7 +118,7 @@ export function MonthlyDashboard() {
     );
   }
 
-  const sortedItems = [...items].sort((a, b) => b.totalMonthlySales - a.totalMonthlySales);
+  const sortedItems = items ? [...items].sort((a, b) => b.totalMonthlySales - a.totalMonthlySales) : [];
 
   return (
     <div className="space-y-6">
@@ -174,7 +127,7 @@ export function MonthlyDashboard() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Monthly Sales Analytics</h2>
           <p className="text-gray-600">
-            {getMonthTitle()} • {items.length > 0 && formatMonthRange(items[0].monthStart, items[0].monthEnd)}
+            {getMonthTitle()} • {items && items.length > 0 && formatMonthRange(items[0].monthStart, items[0].monthEnd)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -218,18 +171,18 @@ export function MonthlyDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Total Items</h3>
-          <p className="text-2xl font-bold text-gray-900">{items.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{items?.length || 0}</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Total Monthly Sales</h3>
           <p className="text-2xl font-bold text-green-600">
-            {formatNumber(items.reduce((sum, item) => sum + item.totalMonthlySales, 0))}
+            {formatNumber(items?.reduce((sum, item) => sum + item.totalMonthlySales, 0) || 0)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Peak Day</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {getMostActiveDay(items)}
+            {items && items.length > 0 ? getMostActiveDay(items) : 'N/A'}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">

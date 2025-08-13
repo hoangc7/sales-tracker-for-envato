@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
+import { useCachedAPI } from '@/hooks/useCachedAPI';
 
 interface DailyBreakdown {
   day: number; // 0=Sunday, 1=Monday, ... 6=Saturday
@@ -27,69 +28,21 @@ interface WeeklyItemData {
 }
 
 export function WeeklyDashboard() {
-  const [items, setItems] = useState<WeeklyItemData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [weeksAgo, setWeeksAgo] = useState(0); // 0 = current week, 1 = last week, etc.
-  const [oldestDate, setOldestDate] = useState<Date | null>(null);
   
-  // Use refs to prevent duplicate API calls in React Strict Mode
-  const oldestDateFetching = useRef(false);
-  const weeklyDataFetching = useRef(false);
-  const currentWeeksAgo = useRef<number | null>(null);
+  // Use cached API calls
+  const { 
+    data: items, 
+    loading, 
+    error 
+  } = useCachedAPI<WeeklyItemData[]>(`/api/analytics/weekly?weeksAgo=${weeksAgo}`, [weeksAgo]);
 
-  // Separate effect for fetching oldest date only once
-  useEffect(() => {
-    if (!oldestDateFetching.current && !oldestDate) {
-      oldestDateFetching.current = true;
-      
-      const fetchOldestDate = async () => {
-        try {
-          const response = await fetch('/api/analytics/data-range?type=oldest');
-          if (response.ok) {
-            const data = await response.json();
-            if (data.oldestDate) {
-              setOldestDate(new Date(data.oldestDate));
-            }
-          }
-        } catch (err) {
-          console.error('Failed to fetch oldest date:', err);
-        }
-      };
+  const { 
+    data: dateRangeData 
+  } = useCachedAPI<{oldestDate?: string}>('/api/analytics/data-range?type=oldest');
 
-      fetchOldestDate();
-    }
-  }, [oldestDate]);
-
-  // Separate effect for fetching weekly data
-  useEffect(() => {
-    if (!weeklyDataFetching.current || currentWeeksAgo.current !== weeksAgo) {
-      weeklyDataFetching.current = true;
-      currentWeeksAgo.current = weeksAgo;
-      
-      const fetchWeeklyData = async () => {
-        try {
-          setLoading(true);
-          const response = await fetch(`/api/analytics/weekly?weeksAgo=${weeksAgo}`);
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch weekly analytics');
-          }
-
-          const data = await response.json();
-          setItems(data);
-          setError(null);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-          setLoading(false);
-          weeklyDataFetching.current = false;
-        }
-      };
-
-      fetchWeeklyData();
-    }
-  }, [weeksAgo]);
+  // Extract oldest date from cached data
+  const oldestDate = dateRangeData?.oldestDate ? new Date(dateRangeData.oldestDate) : null;
 
   const canGoToPreviousWeek = (weeksAgoCheck: number): boolean => {
     if (!oldestDate) return true; // If we don't know, allow navigation
@@ -158,10 +111,10 @@ export function WeeklyDashboard() {
   const goToNextWeek = () => setWeeksAgo(prev => Math.max(0, prev - 1));
   const goToCurrentWeek = () => setWeeksAgo(0);
 
-  if (loading) {
+  if (loading || !items) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg">Loading daily breakdown...</div>
+        <div className="text-lg">Loading weekly breakdown...</div>
       </div>
     );
   }
@@ -174,7 +127,7 @@ export function WeeklyDashboard() {
     );
   }
 
-  const sortedItems = [...items].sort((a, b) => b.totalWeeklySales - a.totalWeeklySales);
+  const sortedItems = items ? [...items].sort((a, b) => b.totalWeeklySales - a.totalWeeklySales) : [];
 
   return (
     <div className="space-y-6">
@@ -183,7 +136,7 @@ export function WeeklyDashboard() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Weekly Sales Analytics</h2>
           <p className="text-gray-600">
-            {getWeekTitle()} • {items.length > 0 && formatWeekRange(items[0].weekStart, items[0].weekEnd)}
+            {getWeekTitle()} • {items && items.length > 0 && formatWeekRange(items[0].weekStart, items[0].weekEnd)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -227,18 +180,18 @@ export function WeeklyDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Total Items</h3>
-          <p className="text-2xl font-bold text-gray-900">{items.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{items?.length || 0}</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Total Weekly Sales</h3>
           <p className="text-2xl font-bold text-green-600">
-            {formatNumber(items.reduce((sum, item) => sum + item.totalWeeklySales, 0))}
+            {formatNumber(items?.reduce((sum, item) => sum + item.totalWeeklySales, 0) || 0)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Peak Day</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {getMostActiveDay(items)}
+            {items && items.length > 0 ? getMostActiveDay(items) : 'N/A'}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">

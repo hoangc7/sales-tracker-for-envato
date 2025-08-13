@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
+import { useCachedAPI } from '@/hooks/useCachedAPI';
 
 interface HourlyBreakdown {
   hour: number; // 0-23
@@ -26,69 +27,21 @@ interface DailyItemData {
 }
 
 export function DailyDashboard() {
-  const [items, setItems] = useState<DailyItemData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [daysAgo, setDaysAgo] = useState(0); // 0 = today, 1 = yesterday, etc.
-  const [oldestDate, setOldestDate] = useState<Date | null>(null);
   
-  // Use refs to prevent duplicate API calls in React Strict Mode
-  const oldestDateFetching = useRef(false);
-  const dailyDataFetching = useRef(false);
-  const currentDaysAgo = useRef<number | null>(null);
+  // Use cached API calls
+  const { 
+    data: items, 
+    loading, 
+    error 
+  } = useCachedAPI<DailyItemData[]>(`/api/analytics/daily?daysAgo=${daysAgo}`, [daysAgo]);
 
-  // Separate effect for fetching oldest date only once
-  useEffect(() => {
-    if (!oldestDateFetching.current && !oldestDate) {
-      oldestDateFetching.current = true;
-      
-      const fetchOldestDate = async () => {
-        try {
-          const response = await fetch('/api/analytics/data-range?type=oldest');
-          if (response.ok) {
-            const data = await response.json();
-            if (data.oldestDate) {
-              setOldestDate(new Date(data.oldestDate));
-            }
-          }
-        } catch (err) {
-          console.error('Failed to fetch oldest date:', err);
-        }
-      };
+  const { 
+    data: dateRangeData 
+  } = useCachedAPI<{oldestDate?: string}>('/api/analytics/data-range?type=oldest');
 
-      fetchOldestDate();
-    }
-  }, [oldestDate]);
-
-  // Separate effect for fetching daily data
-  useEffect(() => {
-    if (!dailyDataFetching.current || currentDaysAgo.current !== daysAgo) {
-      dailyDataFetching.current = true;
-      currentDaysAgo.current = daysAgo;
-      
-      const fetchDailyData = async () => {
-        try {
-          setLoading(true);
-          const response = await fetch(`/api/analytics/daily?daysAgo=${daysAgo}`);
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch daily analytics');
-          }
-
-          const data = await response.json();
-          setItems(data);
-          setError(null);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-          setLoading(false);
-          dailyDataFetching.current = false;
-        }
-      };
-
-      fetchDailyData();
-    }
-  }, [daysAgo]);
+  // Extract oldest date from cached data
+  const oldestDate = dateRangeData?.oldestDate ? new Date(dateRangeData.oldestDate) : null;
 
   const canGoToPreviousDay = (daysAgoCheck: number): boolean => {
     if (!oldestDate) return true; // If we don't know, allow navigation
@@ -148,7 +101,7 @@ export function DailyDashboard() {
   const goToNextDay = () => setDaysAgo(prev => Math.max(0, prev - 1));
   const goToToday = () => setDaysAgo(0);
 
-  if (loading) {
+  if (loading || !items) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-lg">Loading hourly breakdown...</div>
@@ -165,7 +118,7 @@ export function DailyDashboard() {
   }
 
   // Sort items by total daily sales descending
-  const sortedItems = [...items].sort((a, b) => b.totalDailySales - a.totalDailySales);
+  const sortedItems = items ? [...items].sort((a, b) => b.totalDailySales - a.totalDailySales) : [];
 
   return (
     <div className="space-y-6">
@@ -174,7 +127,7 @@ export function DailyDashboard() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Daily Sales Analytics</h2>
           <p className="text-gray-600">
-            {getDayTitle()} • {items.length > 0 && formatDate(items[0].dayStart)}
+            {getDayTitle()} • {items && items.length > 0 && formatDate(items[0].dayStart)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -218,18 +171,18 @@ export function DailyDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Total Items</h3>
-          <p className="text-2xl font-bold text-gray-900">{items.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{items?.length || 0}</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Total Daily Sales</h3>
           <p className="text-2xl font-bold text-green-600">
-            {formatNumber(items.reduce((sum, item) => sum + item.totalDailySales, 0))}
+            {formatNumber(items?.reduce((sum, item) => sum + item.totalDailySales, 0) || 0)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-medium text-gray-500">Peak Hour (GMT+7)</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {formatHour(getMostActiveHour(items))}
+            {items && items.length > 0 ? formatHour(getMostActiveHour(items)) : '--:--'}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">

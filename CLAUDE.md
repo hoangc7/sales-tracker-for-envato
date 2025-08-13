@@ -14,6 +14,7 @@ This is a ThemeForest Sales Tracker built with Next.js, TypeScript, and Tailwind
 - **API Integration**: Envato API client in `/src/lib/envato-api.ts`
 - **Scheduling**: Node-cron for automated hourly scans in GMT+7 timezone
 - **Analytics**: Advanced analytics service with hourly/daily/weekly/monthly calculations
+- **Caching**: Client-side cache system with hourly invalidation and request deduplication
 - **Configuration**: Tracked items with Envato IDs in `/src/config/items.ts`
 
 ## Key Components
@@ -30,6 +31,10 @@ This is a ThemeForest Sales Tracker built with Next.js, TypeScript, and Tailwind
 - `ItemTable.tsx`: Table view with sticky reference comparison
 - `ItemCard.tsx`: Card view for individual items
 - `ScanButton.tsx`: Manual scan trigger component
+
+### Custom Hooks
+- `useCachedAPI.ts`: Client-side cache hook with hourly invalidation and request deduplication
+- `useOldestDate.ts`: Hook for managing date range navigation validation
 
 ### Services
 - `EnvatoApiClient`: API client for fetching item data from Envato
@@ -60,9 +65,10 @@ This is a ThemeForest Sales Tracker built with Next.js, TypeScript, and Tailwind
 
 ### Analytics Endpoints
 - `GET /api/analytics/hourly?hours=24`: Hourly competitor tracking data
-- `GET /api/analytics/daily?days=30`: Daily sales analytics
-- `GET /api/analytics/weekly?days=90`: Weekly performance trends
-- `GET /api/analytics/monthly?days=365`: Monthly insights
+- `GET /api/analytics/daily?daysAgo=0`: Daily sales analytics (0=today, 1=yesterday, etc.)
+- `GET /api/analytics/weekly?weeksAgo=0`: Weekly performance trends (0=current week, etc.)
+- `GET /api/analytics/monthly?monthsAgo=0`: Monthly insights (0=current month, etc.)
+- `GET /api/analytics/data-range?type=oldest`: Get oldest available data date for navigation
 
 ## Deployment Considerations
 
@@ -71,9 +77,45 @@ This is a ThemeForest Sales Tracker built with Next.js, TypeScript, and Tailwind
 - **Environment**: Requires `DATABASE_URL`, optional `ENVATO_API_TOKEN` for higher API limits
 - **Build**: Includes `prisma generate` in build process via `postinstall`
 
+## Client-Side Caching System
+
+### Overview
+The application uses a sophisticated client-side caching system to minimize API calls and provide instant navigation between dashboards:
+
+- **Cache Duration**: Data is cached until the next hour at minute 00 (aligned with hourly data updates)
+- **Global Cache Store**: Shared across all dashboard components for efficient memory usage
+- **Request Deduplication**: Prevents duplicate API calls during React Strict Mode or concurrent component mounting
+- **Automatic Invalidation**: Background monitoring checks for cache expiration every minute
+- **Error Resilience**: Falls back to cached data on network errors
+
+### Cache Implementation
+- **Hook**: `useCachedAPI<T>(url, dependencies, enabled)` in `/src/hooks/useCachedAPI.ts`
+- **Cache Key**: `${url}:${JSON.stringify(dependencies)}` for precise cache management
+- **Expiration Logic**: `Date.now() < entry.expiresAt` where `expiresAt` is next hour at :00 minute
+- **Deduplication**: Global `fetchPromises` store prevents concurrent requests to same endpoint
+
+### Benefits
+- **Instant Navigation**: Switching between cached dashboards is instantaneous
+- **Reduced Server Load**: API calls only when data is stale or unavailable
+- **Better UX**: No loading screens when returning to previously visited dashboards
+- **Development Friendly**: Handles React Strict Mode double-mounting gracefully
+
+## Performance Optimizations
+
+### Duplicate API Call Prevention
+- **Global Request Deduplication**: Concurrent requests to same endpoint share results
+- **React Strict Mode Safe**: Handles development double-mounting without duplicate calls
+- **Loading State Management**: Proper loading/data state handling prevents render issues
+
+### Dashboard Components
+- **Null Safety**: All dashboard components check `if (loading || !items)` before rendering
+- **Error Boundaries**: Graceful error handling with fallback to cached data
+- **Lazy Navigation**: Date range validation only loads when needed
+
 ## Important Files
 
 - `/src/config/items.ts`: Hardcoded list of items to track with Envato IDs
 - `/prisma/schema.prisma`: Database schema definition
 - `/src/lib/envato-api.ts`: Envato API client for fetching item data
+- `/src/hooks/useCachedAPI.ts`: Client-side caching system with request deduplication
 - `vercel.json`: Deployment configuration with function timeouts
