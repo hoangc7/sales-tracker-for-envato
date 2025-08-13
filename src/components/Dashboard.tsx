@@ -119,15 +119,18 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-lg">
-            {autoScanning ? 'Scanning for latest data...' : 'Loading...'}
-          </div>
-          {autoScanning && (
-            <div className="text-sm text-gray-600 mt-2">
-              This may take a few moments as we fetch the latest sales data
+        <div className="flex items-center gap-4 px-8 py-6 bg-white rounded-lg shadow-lg border border-gray-200">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="text-center">
+            <div className="text-xl font-semibold text-gray-900">
+              {autoScanning ? 'Scanning for latest data...' : 'Loading dashboard...'}
             </div>
-          )}
+            {autoScanning && (
+              <div className="text-sm text-gray-600 mt-2">
+                This may take a few moments as we fetch the latest sales data
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

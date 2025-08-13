@@ -114,7 +114,10 @@ export function WeeklyDashboard() {
   if (loading || !items) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg">Loading weekly breakdown...</div>
+        <div className="flex items-center gap-3 px-6 py-4 bg-green-50 rounded-lg border border-green-200">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+          <div className="text-lg font-medium text-green-800">Loading weekly breakdown...</div>
+        </div>
       </div>
     );
   }

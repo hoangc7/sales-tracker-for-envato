@@ -104,7 +104,10 @@ export function DailyDashboard() {
   if (loading || !items) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg">Loading hourly breakdown...</div>
+        <div className="flex items-center gap-3 px-6 py-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+          <div className="text-lg font-medium text-blue-800">Loading hourly breakdown...</div>
+        </div>
       </div>
     );
   }

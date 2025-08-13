@@ -105,7 +105,10 @@ export function MonthlyDashboard() {
   if (loading || !items) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg">Loading monthly breakdown...</div>
+        <div className="flex items-center gap-3 px-6 py-4 bg-purple-50 rounded-lg border border-purple-200">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+          <div className="text-lg font-medium text-purple-800">Loading monthly breakdown...</div>
+        </div>
       </div>
     );
   }
