@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useOldestDate } from '@/hooks/useOldestDate';
+import { useState, useEffect, useRef } from 'react';
 
 interface HourlyBreakdown {
   hour: number; // 0-23
@@ -31,28 +30,76 @@ export function DailyDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [daysAgo, setDaysAgo] = useState(0); // 0 = today, 1 = yesterday, etc.
-  const { canGoToPreviousDay } = useOldestDate();
+  const [oldestDate, setOldestDate] = useState<Date | null>(null);
+  
+  // Use refs to prevent duplicate API calls in React Strict Mode
+  const oldestDateFetching = useRef(false);
+  const dailyDataFetching = useRef(false);
+  const currentDaysAgo = useRef<number | null>(null);
 
-  const fetchDailyData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/analytics/daily?daysAgo=${daysAgo}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch daily analytics');
-      }
-      const data = await response.json();
-      setItems(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+  // Separate effect for fetching oldest date only once
+  useEffect(() => {
+    if (!oldestDateFetching.current && !oldestDate) {
+      oldestDateFetching.current = true;
+      
+      const fetchOldestDate = async () => {
+        try {
+          const response = await fetch('/api/analytics/data-range?type=oldest');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.oldestDate) {
+              setOldestDate(new Date(data.oldestDate));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch oldest date:', err);
+        }
+      };
+
+      fetchOldestDate();
+    }
+  }, [oldestDate]);
+
+  // Separate effect for fetching daily data
+  useEffect(() => {
+    if (!dailyDataFetching.current || currentDaysAgo.current !== daysAgo) {
+      dailyDataFetching.current = true;
+      currentDaysAgo.current = daysAgo;
+      
+      const fetchDailyData = async () => {
+        try {
+          setLoading(true);
+          const response = await fetch(`/api/analytics/daily?daysAgo=${daysAgo}`);
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch daily analytics');
+          }
+
+          const data = await response.json();
+          setItems(data);
+          setError(null);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+          setLoading(false);
+          dailyDataFetching.current = false;
+        }
+      };
+
+      fetchDailyData();
     }
   }, [daysAgo]);
 
-  useEffect(() => {
-    fetchDailyData();
-  }, [fetchDailyData]);
+  const canGoToPreviousDay = (daysAgoCheck: number): boolean => {
+    if (!oldestDate) return true; // If we don't know, allow navigation
+
+    const now = new Date();
+    const targetDate = new Date(now);
+    targetDate.setDate(now.getDate() - (daysAgoCheck + 1));
+    targetDate.setHours(0, 0, 0, 0);
+
+    return targetDate >= oldestDate;
+  };
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
