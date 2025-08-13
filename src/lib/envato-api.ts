@@ -64,9 +64,16 @@ export class EnvatoApiClient {
       const response = await fetch(url, {
         method: 'GET',
         headers: this.headers,
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       if (!response.ok) {
+        // Handle rate limiting specifically
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          throw new Error(`Rate limit exceeded. ${retryAfter ? `Retry after ${retryAfter} seconds` : 'Please wait before retrying'}`);
+        }
+        
         throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
 
@@ -75,6 +82,11 @@ export class EnvatoApiClient {
       
       return data;
     } catch (error) {
+      if (error.name === 'TimeoutError') {
+        console.error(`✗ Timeout fetching item ${itemId}`);
+        throw new Error(`Request timeout for item ${itemId}`);
+      }
+      
       console.error(`✗ Error fetching item ${itemId}:`, error);
       throw error;
     }

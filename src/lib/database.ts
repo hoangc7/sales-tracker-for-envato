@@ -51,6 +51,16 @@ export class DatabaseService {
     });
   }
 
+  async getAllItemsForScan() {
+    // Optimized version for scanning - only fetch required fields
+    return prisma.item.findMany({
+      select: {
+        id: true,        // Required for createSalesRecord
+        envatoId: true,  // Required for API call
+      },
+    });
+  }
+
   async createSalesRecord(data: SalesData) {
     return prisma.salesRecord.create({
       data,
