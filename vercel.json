@@ -3,9 +3,5 @@
     "src/app/api/**": {
       "maxDuration": 300
     }
-  },
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "DIRECT_URL": "@direct_url"
   }
 }
