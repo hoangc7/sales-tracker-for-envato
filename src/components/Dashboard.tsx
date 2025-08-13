@@ -108,7 +108,7 @@ export function Dashboard() {
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [fetchItems]);
 
   if (loading) {
     return (
