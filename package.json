@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "prisma generate && next build",
-    "start": "next start",
+    "dev": "TZ=Australia/Melbourne next dev --turbopack",
+    "build": "TZ=Australia/Melbourne prisma generate && next build",
+    "start": "TZ=Australia/Melbourne next start",
     "lint": "next lint",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "postinstall": "prisma generate"
+    "db:generate": "TZ=Australia/Melbourne prisma generate",
+    "db:push": "TZ=Australia/Melbourne prisma db push",
+    "db:migrate": "TZ=Australia/Melbourne prisma migrate dev",
+    "postinstall": "TZ=Australia/Melbourne prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.13.0",

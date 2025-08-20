@@ -57,10 +57,10 @@ export class EnvatoApiClient {
 
   async getItem(itemId: string): Promise<EnvatoItemData> {
     const url = `${this.baseUrl}?id=${itemId}`;
-    
+
     try {
       console.log(`Fetching item data for ID: ${itemId}`);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: this.headers,
@@ -73,23 +73,23 @@ export class EnvatoApiClient {
           const retryAfter = response.headers.get('Retry-After');
           throw new Error(`Rate limit exceeded. ${retryAfter ? `Retry after ${retryAfter} seconds` : 'Please wait before retrying'}`);
         }
-        
+
         throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
       console.log(`✓ Successfully fetched data for item: ${data.name}`);
-      
+
       return data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorName = error instanceof Error ? error.name : 'UnknownError';
-      
+
       if (errorName === 'TimeoutError') {
         console.error(`✗ Timeout fetching item ${itemId}`);
         throw new Error(`Request timeout for item ${itemId}`);
       }
-      
+
       console.error(`✗ Error fetching item ${itemId}:`, errorMessage);
       throw error instanceof Error ? error : new Error(errorMessage);
     }
@@ -97,7 +97,7 @@ export class EnvatoApiClient {
 
   async scrapeItem(itemId: string): Promise<ScrapedItemData> {
     const itemData = await this.getItem(itemId);
-    
+
     return {
       salesCount: itemData.number_of_sales,
       price: itemData.price_cents / 100, // Convert cents to dollars

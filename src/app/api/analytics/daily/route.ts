@@ -41,9 +41,9 @@ export async function GET(request: Request) {
         if (current.scannedAt >= dayStart && current.scannedAt <= dayEnd) {
           const hourlySales = Math.max(0, current.salesCount - previous.salesCount);
 
-          // Extract hour from timestamp (GMT+7)
+          // Extract hour from timestamp (Melbourne timezone)
           const hour = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Bangkok',
+            timeZone: 'Australia/Melbourne',
             hour: 'numeric',
             hour12: false
           }).format(current.scannedAt);

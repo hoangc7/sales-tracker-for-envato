@@ -24,6 +24,7 @@ export interface SalesData {
   itemId: string;
   salesCount: number;
   price?: number;
+  scannedAt?: Date; // Optional - if not provided, will use Melbourne time
 }
 
 export class DatabaseService {
@@ -63,7 +64,13 @@ export class DatabaseService {
 
   async createSalesRecord(data: SalesData) {
     return prisma.salesRecord.create({
-      data,
+      data: {
+        itemId: data.itemId,
+        salesCount: data.salesCount,
+        price: data.price,
+        // scannedAt will use @default(now()) with Melbourne timezone
+        ...(data.scannedAt && { scannedAt: data.scannedAt }),
+      },
     });
   }
 
