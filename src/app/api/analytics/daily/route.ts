@@ -30,8 +30,9 @@ export async function GET(request: Request) {
       // Get sales history for a broader range to calculate growth
       const salesHistory = await db.getSalesHistory(item.id, 7);
 
-      // Calculate hourly sales from history - only for hours with data
+      // Calculate hourly sales from history - include all scanned hours
       const hourlyData = new Map<number, number>();
+      const scannedHours = new Set<number>();
 
       for (let i = 0; i < salesHistory.length - 1; i++) {
         const current = salesHistory[i];
@@ -50,16 +51,23 @@ export async function GET(request: Request) {
 
           const hourIndex = parseInt(hour);
           if (hourIndex >= 0 && hourIndex < 24) {
+            // Track that this hour was scanned
+            scannedHours.add(hourIndex);
+            // Add sales for this hour
             hourlyData.set(hourIndex, (hourlyData.get(hourIndex) || 0) + hourlySales);
           }
         }
       }
 
-      // Convert to array format, only including hours with recorded data
-      const hourlyBreakdown = Array.from(hourlyData.entries()).map(([hour, sales]) => ({
+      // Ensure all scanned hours are included in hourlyBreakdown, even with 0 sales
+      const hourlyBreakdown = Array.from(scannedHours).map(hour => ({
         hour,
-        sales
-      }));
+        sales: hourlyData.get(hour) || 0
+      })).sort((a, b) => a.hour - b.hour);
+
+      // Debug logging
+      console.log(`Item ${item.name}: Scanned hours:`, Array.from(scannedHours).sort());
+      console.log(`Item ${item.name}: Hourly breakdown:`, hourlyBreakdown);
 
       // Calculate totals and peak hour
       const totalDailySales = hourlyBreakdown.reduce((sum, hour) => sum + hour.sales, 0);

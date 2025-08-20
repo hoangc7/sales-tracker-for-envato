@@ -24,7 +24,7 @@ export interface SalesData {
   itemId: string;
   salesCount: number;
   price?: number;
-  scannedAt?: Date; // Optional - if not provided, will use Melbourne time
+  scannedAt?: Date;
 }
 
 export class DatabaseService {
