@@ -289,6 +289,9 @@ export function DailyDashboard() {
                     {hourlySales.map((sales, hour) => {
                       const intensity = maxHourlySales > 0 ? (sales / maxHourlySales) : 0;
                       const bgColor = sales > 0 ? `rgba(34, 197, 94, ${0.1 + intensity * 0.8})` : 'transparent';
+                      
+                      // Check if this hour has data in the original hourlyBreakdown
+                      const hasData = item.hourlyBreakdown.some(h => h.hour === hour);
 
                       return (
                         <td
@@ -300,9 +303,11 @@ export function DailyDashboard() {
                             className="h-8 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
-                            <span className={intensity > 0.5 ? 'text-white' : 'text-gray-700'}>
-                              {sales}
-                            </span>
+                            {hasData && (
+                              <span className={intensity > 0.5 ? 'text-white' : 'text-gray-700'}>
+                                {sales}
+                              </span>
+                            )}
                           </div>
                         </td>
                       );
