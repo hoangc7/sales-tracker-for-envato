@@ -28,16 +28,16 @@ interface DailyItemData {
 
 export function DailyDashboard() {
   const [daysAgo, setDaysAgo] = useState(0); // 0 = today, 1 = yesterday, etc.
-  
+
   // Use cached API calls
-  const { 
-    data: items, 
-    loading, 
-    error 
+  const {
+    data: items,
+    loading,
+    error
   } = useCachedAPI<DailyItemData[]>(`/api/analytics/daily?daysAgo=${daysAgo}`, [daysAgo]);
 
-  const { 
-    data: dateRangeData 
+  const {
+    data: dateRangeData
   } = useCachedAPI<{oldestDate?: string}>('/api/analytics/data-range?type=oldest');
 
   // Extract oldest date from cached data
@@ -300,11 +300,9 @@ export function DailyDashboard() {
                             className="h-8 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
-                            {item.hourlyBreakdown.find(h => h.hour === hour) && (
-                              <span className={intensity > 0.5 ? 'text-white' : 'text-gray-700'}>
-                                {sales}
-                              </span>
-                            )}
+                            <span className={intensity > 0.5 ? 'text-white' : 'text-gray-700'}>
+                              {sales}
+                            </span>
                           </div>
                         </td>
                       );
