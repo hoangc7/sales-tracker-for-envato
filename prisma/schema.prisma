@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,27 +9,43 @@ datasource db {
 }
 
 model Item {
-  id          String   @id @default(cuid())
-  name        String
-  url         String   @unique
-  envatoId    String   @unique
-  author      String?
-  category    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String        @id @default(cuid())
+  name         String
+  url          String        @unique
+  envatoId     String        @unique
+  author       String?
+  category     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   salesRecords SalesRecord[]
 
   @@map("items")
 }
 
 model SalesRecord {
-  id          String   @id @default(cuid())
-  itemId      String
-  salesCount  Int
-  price       Float?
-  scannedAt   DateTime @default(now())
-
-  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  itemId     String
+  salesCount Int
+  price      Float?
+  scannedAt  DateTime @default(now())
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@map("sales_records")
+}
+
+model ScanHistory {
+  id           String     @id @default(cuid())
+  startedAt    DateTime   @default(now())
+  completedAt  DateTime?
+  status       ScanStatus @default(RUNNING)
+  itemsScanned Int        @default(0)
+  error        String?
+
+  @@map("scan_history")
+}
+
+enum ScanStatus {
+  RUNNING
+  COMPLETED
+  FAILED
 }
