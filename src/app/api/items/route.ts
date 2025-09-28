@@ -35,7 +35,22 @@ export async function GET() {
     const itemsWithStats = await Promise.all(
       items.map(async (item) => {
         const dailySales = await db.getDailySales(item.id, 7);
-        const weeklySales = dailySales.reduce((sum, day) => sum + day.dailySales, 0);
+
+        // Calculate weekly sales for current calendar week (Monday-Sunday) in Melbourne timezone
+        const now = new Date();
+        const melbourneNow = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Melbourne' }));
+        const currentDay = melbourneNow.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysToMonday = currentDay === 0 ? 6 : currentDay - 1; // Days back to get to Monday
+
+        // Get Monday of current week (in Melbourne timezone)
+        const currentMonday = new Date(melbourneNow);
+        currentMonday.setDate(melbourneNow.getDate() - daysToMonday);
+        currentMonday.setHours(0, 0, 0, 0);
+
+        // Calculate weekly sales only for current week
+        const weeklySales = dailySales
+          .filter(day => day.date >= currentMonday)
+          .reduce((sum, day) => sum + day.dailySales, 0);
         
         return {
           id: item.id,
