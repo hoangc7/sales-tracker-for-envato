@@ -34,13 +34,33 @@ export async function GET(request: Request) {
       // Get sales history for a broader range to calculate growth
       const salesHistory = await db.getSalesHistory(item.id, 30);
 
-      // Initialize 7 days (0=Sunday, 1=Monday, ... 6=Saturday) with zero sales
+      // Initialize daily breakdown - only include past days for current week
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const dailyBreakdown = Array.from({ length: 7 }, (_, day) => ({
-        day,
-        dayName: dayNames[day],
-        sales: 0
-      }));
+      const dailyBreakdown = [];
+
+      // For current week (weeksAgo=0), only include days up to today (in Monday-based week)
+      // For past weeks, include all 7 days
+      const melbourneNow = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Melbourne' }));
+      const currentDayOfWeek = melbourneNow.getDay(); // 0=Sunday, 1=Monday, etc.
+
+      // Convert to Monday-based week position: Monday=0, Tuesday=1, ..., Sunday=6
+      const currentWeekPosition = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+
+      // For current week, include Monday through today
+      // For past weeks, include all 7 days (Monday through Sunday)
+      const maxWeekPosition = weeksAgo === 0 ? currentWeekPosition : 6;
+
+      // Add days in Monday-first order: Monday=1, Tuesday=2, ..., Sunday=0
+      const mondayBasedOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+
+      for (let weekPos = 0; weekPos <= maxWeekPosition; weekPos++) {
+        const actualDay = mondayBasedOrder[weekPos]; // Convert week position to actual day number
+        dailyBreakdown.push({
+          day: actualDay,
+          dayName: dayNames[actualDay],
+          sales: 0
+        });
+      }
 
       // Calculate daily sales from history - only for the target week
       for (let i = 0; i < salesHistory.length - 1; i++) {
@@ -53,7 +73,12 @@ export async function GET(request: Request) {
 
           // Get day of week in GMT+7
           const dayOfWeek = current.scannedAt.getDay(); // 0 = Sunday
-          dailyBreakdown[dayOfWeek].sales += dailySales;
+
+          // Only add sales if this day is included in our breakdown (for current week, exclude future days)
+          const dayEntry = dailyBreakdown.find(d => d.day === dayOfWeek);
+          if (dayEntry) {
+            dayEntry.sales += dailySales;
+          }
         }
       }
 

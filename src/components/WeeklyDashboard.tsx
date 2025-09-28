@@ -236,7 +236,7 @@ export function WeeklyDashboard() {
                 // Create array with sales for each day (Mon=1, Tue=2, ..., Sun=0)
                 // Reorder to Mon-Sun display order
                 const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
-                const dailySales = new Array(7).fill(0);
+                const dailySales = new Array(7).fill(null); // Use null for missing days
 
                 item.dailyBreakdown.forEach(dayData => {
                   const displayIndex = dayOrder.indexOf(dayData.day);
@@ -245,7 +245,7 @@ export function WeeklyDashboard() {
                   }
                 });
 
-                const maxDailySales = Math.max(...dailySales);
+                const maxDailySales = Math.max(...dailySales.filter(s => s !== null));
 
                 return (
                   <tr key={item.id} className={index === 0 ? 'bg-green-50' : 'hover:bg-gray-50'}>
@@ -302,23 +302,25 @@ export function WeeklyDashboard() {
 
                     {/* 7 Day Columns */}
                     {dailySales.map((sales, dayIndex) => {
-                      const intensity = maxDailySales > 0 ? (sales / maxDailySales) : 0;
-                      const bgColor = sales > 0 ? `rgba(59, 130, 246, ${0.1 + intensity * 0.8})` : 'transparent';
                       const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                      const hasData = sales !== null;
+                      const actualSales = sales || 0;
+                      const intensity = maxDailySales > 0 && hasData ? (actualSales / maxDailySales) : 0;
+                      const bgColor = actualSales > 0 ? `rgba(59, 130, 246, ${0.1 + intensity * 0.8})` : 'transparent';
 
                       return (
                         <td
                           key={dayIndex}
                           className="px-4 py-4 text-center"
-                          title={`${dayNames[dayIndex]}: ${sales} sales`}
+                          title={`${dayNames[dayIndex]}: ${hasData ? actualSales + ' sales' : 'No data'}`}
                         >
                           <div
                             className="h-10 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
-                            {sales > 0 && (
+                            {hasData && (
                               <span className={intensity > 0.5 ? 'text-white' : 'text-gray-700'}>
-                                {sales}
+                                {actualSales}
                               </span>
                             )}
                           </div>
