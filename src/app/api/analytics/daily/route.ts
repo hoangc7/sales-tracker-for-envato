@@ -59,11 +59,26 @@ export async function GET(request: Request) {
         }
       }
 
-      // Ensure all scanned hours are included in hourlyBreakdown, even with 0 sales
-      const hourlyBreakdown = Array.from(scannedHours).map(hour => ({
-        hour,
-        sales: hourlyData.get(hour) || 0
-      })).sort((a, b) => a.hour - b.hour);
+      // Create hourly breakdown only for past hours (and current hour)
+      const now = new Date();
+      const currentHour = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Australia/Melbourne',
+        hour: 'numeric',
+        hour12: false
+      }).format(now);
+      const currentHourIndex = parseInt(currentHour);
+
+      // For days other than today, include all 24 hours
+      // For today, only include hours up to and including the current hour
+      const maxHour = daysAgo === 0 ? currentHourIndex : 23;
+
+      const hourlyBreakdown = [];
+      for (let hour = 0; hour <= maxHour; hour++) {
+        hourlyBreakdown.push({
+          hour,
+          sales: scannedHours.has(hour) ? (hourlyData.get(hour) || 0) : 0
+        });
+      }
 
       // Debug logging
       console.log(`Item ${item.name}: Scanned hours:`, Array.from(scannedHours).sort());
