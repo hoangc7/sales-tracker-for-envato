@@ -1,16 +1,14 @@
 'use client';
 
-export type DashboardView = 'overview' | 'daily' | 'weekly';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-interface DashboardNavigationProps {
-  currentView: DashboardView;
-  onViewChange: (view: DashboardView) => void;
-}
+export function DashboardNavigation() {
+  const pathname = usePathname();
 
-export function DashboardNavigation({ currentView, onViewChange }: DashboardNavigationProps) {
   const navItems = [
     {
-      id: 'overview' as DashboardView,
+      href: '/',
       name: 'Overview',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,7 +19,7 @@ export function DashboardNavigation({ currentView, onViewChange }: DashboardNavi
       description: 'General overview and comparison'
     },
     {
-      id: 'daily' as DashboardView,
+      href: '/daily',
       name: 'Daily',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,7 +30,7 @@ export function DashboardNavigation({ currentView, onViewChange }: DashboardNavi
       description: 'Hourly breakdown (0-24h)'
     },
     {
-      id: 'weekly' as DashboardView,
+      href: '/weekly',
       name: 'Weekly',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,25 +49,28 @@ export function DashboardNavigation({ currentView, onViewChange }: DashboardNavi
           {/* Scroll container */}
           <div className="overflow-x-auto scrollbar-hide">
             <nav className="flex px-4 md:px-4" aria-label="Tabs">
-              {navItems.map((item, index) => (
-                <button
-                  key={item.id}
-                  onClick={() => onViewChange(item.id)}
-                  className={`${
-                    currentView === item.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  } whitespace-nowrap py-4 px-3 md:px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors flex-shrink-0 ${
-                    index < navItems.length - 1 ? 'mr-4 md:mr-8' : ''
-                  }`}
-                >
-                  {item.icon}
-                  <div className="text-left">
-                    <div className="font-semibold">{item.name}</div>
-                    <div className="text-xs opacity-75 hidden sm:block">{item.description}</div>
-                  </div>
-                </button>
-              ))}
+              {navItems.map((item, index) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`${
+                      isActive
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-3 md:px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors flex-shrink-0 ${
+                      index < navItems.length - 1 ? 'mr-4 md:mr-8' : ''
+                    }`}
+                  >
+                    {item.icon}
+                    <div className="text-left">
+                      <div className="font-semibold">{item.name}</div>
+                      <div className="text-xs opacity-75 hidden sm:block">{item.description}</div>
+                    </div>
+                  </Link>
+                );
+              })}
             </nav>
           </div>
           
