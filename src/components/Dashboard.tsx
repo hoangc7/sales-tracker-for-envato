@@ -7,7 +7,6 @@ import { ViewToggle } from './ViewToggle';
 import { DashboardNavigation, DashboardView } from './DashboardNavigation';
 import { DailyDashboard } from './DailyDashboard';
 import { WeeklyDashboard } from './WeeklyDashboard';
-import { MonthlyDashboard } from './MonthlyDashboard';
 import { ScanButton } from './ScanButton';
 
 type ViewMode = 'table' | 'cards';
@@ -150,8 +149,6 @@ export function Dashboard() {
         return <DailyDashboard />;
       case 'weekly':
         return <WeeklyDashboard />;
-      case 'monthly':
-        return <MonthlyDashboard />;
       case 'overview':
       default:
         return (
