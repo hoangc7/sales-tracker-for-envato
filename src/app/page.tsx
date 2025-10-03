@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { ItemTable } from '@/components/ItemTable';
 import { ItemCard } from '@/components/ItemCard';
@@ -39,7 +39,7 @@ export default function Home() {
     refresh 
   } = useCachedAPI<ItemData[]>('/api/items', []);
 
-  const performScan = async () => {
+  const performScan = useCallback(async () => {
     try {
       setAutoScanning(true);
       const response = await fetch('/api/scan', {
@@ -60,7 +60,7 @@ export default function Home() {
     } finally {
       setAutoScanning(false);
     }
-  };
+  }, [refresh]);
 
   const shouldAutoScan = (data: ItemData[]) => {
     // Trigger auto-scan if:
@@ -87,7 +87,7 @@ export default function Home() {
         performScan();
       }
     }
-  }, [loading, items]);
+  }, [loading, items, performScan]);
 
   if (loading || !items) {
     return (

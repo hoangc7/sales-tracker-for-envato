@@ -23,7 +23,7 @@ export const CACHE_REVALIDATION = {
  * @param tags Cache tags for invalidation
  * @param revalidate Revalidation time in seconds
  */
-export function createCachedFunction<T extends (...args: any[]) => Promise<any>>(
+export function createCachedFunction<T extends (...args: unknown[]) => Promise<unknown>>(
   fn: T,
   keyParts: string[],
   tags: string[],

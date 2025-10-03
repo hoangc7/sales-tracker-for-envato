@@ -137,7 +137,10 @@ export class DatabaseService {
 
   // Optimized batch query - fetch sales history for all items in one query
   async getBatchSalesHistory(itemIds: string[], days?: number) {
-    const where: any = { itemId: { in: itemIds } };
+    const where: {
+      itemId: { in: string[] };
+      scannedAt?: { gte: Date };
+    } = { itemId: { in: itemIds } };
     
     if (days) {
       const since = new Date();
