@@ -153,7 +153,7 @@ export function Dashboard() {
       default:
         return (
           <div className="space-y-8">
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-4">
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-gray-900">Overview</h2>
                 <p className="text-gray-600 mt-2">General comparison and current status</p>

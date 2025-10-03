@@ -135,7 +135,7 @@ export function WeeklyDashboard() {
   return (
     <div className="space-y-6">
       {/* Header with navigation */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Weekly Sales Analytics</h2>
           <p className="text-gray-600">
@@ -212,7 +212,7 @@ export function WeeklyDashboard() {
             <thead className="bg-gray-50">
               <tr>
                 {/* Item Column */}
-                <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[280px]">
+                <th className="sticky left-0 bg-gray-50 px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[200px] sm:min-w-[280px]">
                   Item
                 </th>
                 {/* Total Sales Column */}
@@ -250,7 +250,7 @@ export function WeeklyDashboard() {
                 return (
                   <tr key={item.id} className={index === 0 ? 'bg-green-50' : 'hover:bg-gray-50'}>
                     {/* Item Column - Sticky */}
-                    <td className="sticky left-0 bg-white px-6 py-4 border-r border-gray-200">
+                    <td className="sticky left-0 bg-white px-3 sm:px-6 py-4 border-r border-gray-200">
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold text-gray-900 text-sm">{item.name}</h3>
