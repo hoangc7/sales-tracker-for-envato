@@ -3,15 +3,5 @@
     "src/app/api/**": {
       "maxDuration": 300
     }
-  },
-  "crons": [
-    {
-      "path": "/api/scan",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/scan",
-      "schedule": "30 * * * *"
-    }
-  ]
+  }
 }
