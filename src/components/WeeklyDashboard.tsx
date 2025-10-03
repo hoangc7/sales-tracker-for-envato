@@ -13,6 +13,7 @@ interface WeeklyItemData {
   id: string;
   name: string;
   url: string;
+  envatoId: string;
   author?: string;
   category?: string;
   latestSales: number;
@@ -248,7 +249,7 @@ export function WeeklyDashboard() {
                 const maxDailySales = Math.max(...dailySales.filter(s => s !== null));
 
                 return (
-                  <tr key={item.id} className={index === 0 ? 'bg-green-50' : 'hover:bg-gray-50'}>
+                  <tr key={item.envatoId} className={index === 0 ? 'bg-green-50' : 'hover:bg-gray-50'}>
                     {/* Item Column - Sticky */}
                     <td className="sticky left-0 bg-white px-3 sm:px-6 py-4 border-r border-gray-200">
                       <div className="flex flex-col">

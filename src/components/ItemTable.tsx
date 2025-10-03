@@ -4,6 +4,7 @@ interface ItemData {
   id: string;
   name: string;
   url: string;
+  envatoId: string;
   author?: string;
   category?: string;
   latestSales: number;
@@ -102,7 +103,7 @@ export function ItemTable({ items }: ItemTableProps) {
               
               return (
                 <tr 
-                  key={item.id}
+                  key={item.envatoId}
                   className={`hover:bg-gray-50 ${isReference ? 'bg-blue-50 hover:bg-blue-100 sticky top-0 z-20 shadow-sm' : ''}`}
                 >
                   {/* Item Info - Sticky Column */}

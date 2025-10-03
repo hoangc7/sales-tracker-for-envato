@@ -116,6 +116,7 @@ async function getWeeklyAnalyticsData(weeksAgo: number) {
       id: item.id,
       name: item.name,
       url: item.url,
+      envatoId: item.envatoId,
       author: item.author || undefined,
       category: item.category || undefined,
       latestSales: salesHistory[0]?.salesCount || 0,

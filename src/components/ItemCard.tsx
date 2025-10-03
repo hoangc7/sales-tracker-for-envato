@@ -4,6 +4,7 @@ interface ItemData {
   id: string;
   name: string;
   url: string;
+  envatoId: string;
   author?: string;
   category?: string;
   latestSales: number;

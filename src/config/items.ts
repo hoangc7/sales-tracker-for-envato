@@ -24,24 +24,34 @@ export const TRACKED_ITEMS = [
     envatoId: "15780546",
     url: "https://themeforest.net/item/xstore-responsive-woocommerce-theme/15780546",
   },
-  {
-    name: "Blonwe",
-    envatoId: "48378751",
-    url: "https://themeforest.net/item/blonwe-multipurpose-woocommerce-theme/48378751",
-  },
+  // {
+  //   name: "Blonwe",
+  //   envatoId: "48378751",
+  //   url: "https://themeforest.net/item/blonwe-multipurpose-woocommerce-theme/48378751",
+  // },
   {
     name: "Sober",
     envatoId: "18332889",
     url: "https://themeforest.net/item/sober-woocommerce-wordpress-theme/18332889",
   },
   {
-	name: "Konte",
-	envatoId: "23162599",
-	url: "https://themeforest.net/item/konte-minimal-modern-woocommerce-wordpress-theme/23162599",
+    name: "Konte",
+    envatoId: "23162599",
+    url: "https://themeforest.net/item/konte-minimal-modern-woocommerce-wordpress-theme/23162599",
   },
   {
-	name: "Motta",
-	envatoId: "47722442",
-	url: "https://themeforest.net/item/motta-multivendor-and-marketplace-wordpress-theme/47722442",
+    name: "Motta",
+    envatoId: "47722442",
+    url: "https://themeforest.net/item/motta-multivendor-and-marketplace-wordpress-theme/47722442",
+  },
+  {
+    name: "Ecomus",
+    envatoId: "54322665",
+    url: "https://themeforest.net/item/ecomus-multipurpose-woocommerce-theme/54322665",
+  },
+  {
+    name: "Modave",
+    envatoId: "58574501",
+    url: "https://themeforest.net/item/modave-multipurpose-woocommerce-wordpress-theme/58574501",
   },
 ];
