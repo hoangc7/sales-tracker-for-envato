@@ -80,10 +80,6 @@ export async function GET(request: Request) {
         });
       }
 
-      // Debug logging
-      console.log(`Item ${item.name}: Scanned hours:`, Array.from(scannedHours).sort());
-      console.log(`Item ${item.name}: Hourly breakdown:`, hourlyBreakdown);
-
       // Calculate totals and peak hour
       const totalDailySales = hourlyBreakdown.reduce((sum, hour) => sum + hour.sales, 0);
       const peakHourData = hourlyBreakdown.reduce((peak, hour) =>

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import CronJobMonitor from '@/components/CronJobMonitor';
 import { ScanButton } from '@/components/ScanButton';
 
@@ -38,7 +39,7 @@ export default function ScanHistoryPage() {
               © 2024 ThemeForest Sales Tracker. All rights reserved.
             </div>
             <div className="flex items-center space-x-6">
-              <a
+              <Link
                 href="/"
                 className="text-sm text-gray-600 hover:text-gray-900 transition-colors flex items-center space-x-2"
               >
@@ -47,7 +48,7 @@ export default function ScanHistoryPage() {
                         d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
                 <span>Back to Dashboard</span>
-              </a>
+              </Link>
             </div>
           </div>
         </div>

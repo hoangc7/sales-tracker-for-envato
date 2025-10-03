@@ -100,8 +100,9 @@ export async function POST() {
 
     // If we have a scan record, mark it as failed
     if (typeof error === 'object' && error !== null && 'scanId' in error) {
+      const errorWithScanId = error as { scanId: string };
       await prisma.scanHistory.update({
-        where: { id: (error as any).scanId },
+        where: { id: errorWithScanId.scanId },
         data: {
           status: 'FAILED',
           completedAt: new Date(),

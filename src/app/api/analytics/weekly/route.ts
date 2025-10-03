@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
       // Initialize daily breakdown - only include past days for current week
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const dailyBreakdown = [];
+      const dailyBreakdown: Array<{ day: number; dayName: string; sales: number }> = [];
 
       // For current week (weeksAgo=0), only include days up to today (in Monday-based week)
       // For past weeks, include all 7 days
