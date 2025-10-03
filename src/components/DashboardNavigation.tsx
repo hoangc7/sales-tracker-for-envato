@@ -46,26 +46,37 @@ export function DashboardNavigation({ currentView, onViewChange }: DashboardNavi
 
   return (
     <div className="bg-white border-b border-gray-200">
-      <div className="container mx-auto px-4">
-        <nav className="flex space-x-8" aria-label="Tabs">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onViewChange(item.id)}
-              className={`${
-                currentView === item.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
-            >
-              {item.icon}
-              <div className="text-left">
-                <div className="font-semibold">{item.name}</div>
-                <div className="text-xs opacity-75">{item.description}</div>
-              </div>
-            </button>
-          ))}
-        </nav>
+      <div className="container mx-auto">
+        <div className="relative">
+          {/* Scroll container */}
+          <div className="overflow-x-auto scrollbar-hide">
+            <nav className="flex px-4 md:px-4" aria-label="Tabs">
+              {navItems.map((item, index) => (
+                <button
+                  key={item.id}
+                  onClick={() => onViewChange(item.id)}
+                  className={`${
+                    currentView === item.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap py-4 px-3 md:px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors flex-shrink-0 ${
+                    index < navItems.length - 1 ? 'mr-4 md:mr-8' : ''
+                  }`}
+                >
+                  {item.icon}
+                  <div className="text-left">
+                    <div className="font-semibold">{item.name}</div>
+                    <div className="text-xs opacity-75 hidden sm:block">{item.description}</div>
+                  </div>
+                </button>
+              ))}
+            </nav>
+          </div>
+          
+          {/* Scroll indicators */}
+          <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-white to-transparent pointer-events-none md:hidden"></div>
+          <div className="absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-white to-transparent pointer-events-none md:hidden"></div>
+        </div>
       </div>
     </div>
   );
