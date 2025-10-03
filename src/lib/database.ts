@@ -134,4 +134,31 @@ export class DatabaseService {
       where: { id: itemId },
     });
   }
+
+  // Optimized batch query - fetch sales history for all items in one query
+  async getBatchSalesHistory(itemIds: string[], days?: number) {
+    const where: any = { itemId: { in: itemIds } };
+    
+    if (days) {
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      where.scannedAt = { gte: since };
+    }
+
+    const records = await prisma.salesRecord.findMany({
+      where,
+      orderBy: { scannedAt: 'desc' },
+    });
+
+    // Group by itemId for easier processing
+    const grouped = new Map<string, typeof records>();
+    for (const record of records) {
+      if (!grouped.has(record.itemId)) {
+        grouped.set(record.itemId, []);
+      }
+      grouped.get(record.itemId)!.push(record);
+    }
+
+    return grouped;
+  }
 }

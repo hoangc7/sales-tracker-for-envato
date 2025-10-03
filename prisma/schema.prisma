@@ -30,6 +30,8 @@ model SalesRecord {
   scannedAt  DateTime @default(now())
   item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
+  @@index([itemId, scannedAt])
+  @@index([scannedAt])
   @@map("sales_records")
 }
 

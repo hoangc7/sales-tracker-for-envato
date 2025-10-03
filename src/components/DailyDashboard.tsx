@@ -323,7 +323,7 @@ export function DailyDashboard() {
           <div className="flex items-center gap-4">
             <span>💡 <strong>Legend:</strong></span>
             <span>Darker green = More sales in that hour</span>
-            <span>All times in GMT+7</span>
+            <span>All times in Australia/Melbourne</span>
           </div>
           <div className="text-xs text-gray-500">
             Hover over hour cells for details • Scroll horizontally to see all 24 hours
