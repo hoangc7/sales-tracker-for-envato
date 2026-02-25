@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
-import { unstable_cache } from 'next/cache';
-import { CACHE_TAGS, CACHE_REVALIDATION } from '@/lib/cache';
+
+export const dynamic = 'force-dynamic';
 
 async function getMonthlyAnalyticsData(monthsAgo: number) {
   // Calculate the start and end of the target month
@@ -108,23 +108,12 @@ async function getMonthlyAnalyticsData(monthsAgo: number) {
   return monthlyView;
 }
 
-// Create cached version of the function
-const getCachedMonthlyAnalytics = (monthsAgo: number) =>
-  unstable_cache(
-    () => getMonthlyAnalyticsData(monthsAgo),
-    [`monthly-analytics-${monthsAgo}`],
-    {
-      tags: [CACHE_TAGS.MONTHLY_ANALYTICS],
-      revalidate: CACHE_REVALIDATION.ANALYTICS,
-    }
-  )();
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const monthsAgo = parseInt(searchParams.get('monthsAgo') || '0');
 
-    const monthlyView = await getCachedMonthlyAnalytics(monthsAgo);
+    const monthlyView = await getMonthlyAnalyticsData(monthsAgo);
     return NextResponse.json(monthlyView);
   } catch (error) {
     console.error('Monthly analytics error:', error);
