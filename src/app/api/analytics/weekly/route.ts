@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
-import { unstable_cache } from 'next/cache';
-import { CACHE_TAGS, CACHE_REVALIDATION } from '@/lib/cache';
+
+export const dynamic = 'force-dynamic';
 
 async function getWeeklyAnalyticsData(weeksAgo: number) {
   // Calculate the start and end of the target week
@@ -135,23 +135,12 @@ async function getWeeklyAnalyticsData(weeksAgo: number) {
   return weeklyView;
 }
 
-// Create cached version of the function
-const getCachedWeeklyAnalytics = (weeksAgo: number) =>
-  unstable_cache(
-    () => getWeeklyAnalyticsData(weeksAgo),
-    [`weekly-analytics-${weeksAgo}`],
-    {
-      tags: [CACHE_TAGS.WEEKLY_ANALYTICS],
-      revalidate: CACHE_REVALIDATION.ANALYTICS,
-    }
-  )();
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const weeksAgo = parseInt(searchParams.get('weeksAgo') || '0');
 
-    const weeklyView = await getCachedWeeklyAnalytics(weeksAgo);
+    const weeklyView = await getWeeklyAnalyticsData(weeksAgo);
     return NextResponse.json(weeklyView);
   } catch (error) {
     console.error('Weekly analytics error:', error);

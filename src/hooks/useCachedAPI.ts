@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface CacheEntry<T> {
   data: T;
@@ -37,7 +37,8 @@ export function useCachedAPI<T>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [fetchTrigger, setFetchTrigger] = useState(0);
+
   const fetchingRef = useRef(false);
 
   // Create stable cache key
@@ -46,13 +47,10 @@ export function useCachedAPI<T>(
   useEffect(() => {
     if (!enabled) return;
 
-    const fetchData = async (force = false) => {
-      console.log(`fetchData called for ${url}, force: ${force}, fetching: ${fetchingRef.current}, enabled: ${enabled}`);
-      
+    const fetchData = async () => {
       // Check cache first
       const cachedEntry = globalCache[cacheKey];
-      if (!force && cachedEntry && isCacheValid(cachedEntry)) {
-        console.log(`Cache hit for ${url}`, cachedEntry.data);
+      if (cachedEntry && isCacheValid(cachedEntry)) {
         setData(cachedEntry.data as T);
         setLoading(false);
         setError(null);
@@ -61,44 +59,37 @@ export function useCachedAPI<T>(
 
       // Check if there's already a pending request for this URL
       if (cacheKey in globalFetchPromises) {
-        console.log(`Request already in progress for ${url}, waiting for result...`);
         try {
           const result = await globalFetchPromises[cacheKey];
-          console.log(`Got result from shared request for ${url}:`, result);
           setData(result as T);
           setLoading(false);
           setError(null);
           return;
         } catch (err) {
-          console.error(`Shared request failed for ${url}:`, err);
           setError(err instanceof Error ? err.message : 'Network error');
           setLoading(false);
           return;
         }
       }
 
-      console.log(`Cache miss for ${url}, starting fetch...`);
       fetchingRef.current = true;
       setLoading(true);
       setError(null);
 
       // Create and store the fetch promise
       const fetchPromise = (async () => {
-        console.log(`Making fetch request to ${url}`);
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        const result = await response.json();
-        console.log(`Fetch successful for ${url}:`, result);
-        return result;
+        return await response.json();
       })();
 
       globalFetchPromises[cacheKey] = fetchPromise;
 
       try {
         const result = await fetchPromise;
-        
+
         // Cache the result immediately
         globalCache[cacheKey] = {
           data: result,
@@ -106,16 +97,12 @@ export function useCachedAPI<T>(
           expiresAt: getNextHourTimestamp()
         };
 
-        console.log(`Setting data and cached ${url} until ${new Date(getNextHourTimestamp()).toLocaleTimeString()}`);
-        
         setData(result as T);
         setError(null);
         setLoading(false);
       } catch (err) {
-        console.error(`Error fetching ${url}:`, err);
-        
         setError(err instanceof Error ? err.message : 'Network error');
-        
+
         // Keep showing cached data if available
         if (!cachedEntry) {
           setData(null);
@@ -128,9 +115,8 @@ export function useCachedAPI<T>(
       }
     };
 
-    console.log(`useEffect triggered for ${url}`);
     fetchData();
-  }, [url, cacheKey, enabled]);
+  }, [url, cacheKey, enabled, fetchTrigger]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -146,10 +132,10 @@ export function useCachedAPI<T>(
     const interval = setInterval(() => {
       const cachedEntry = globalCache[cacheKey];
       if (cachedEntry && !isCacheValid(cachedEntry)) {
-        console.log(`Cache expired for ${url}, refetching...`);
-        // Trigger refetch by clearing loading state
+        // Delete expired cache entry and trigger a refetch
+        delete globalCache[cacheKey];
         if (!fetchingRef.current) {
-          setLoading(true);
+          setFetchTrigger(prev => prev + 1);
         }
       }
     }, 60000);
@@ -157,11 +143,13 @@ export function useCachedAPI<T>(
     return () => clearInterval(interval);
   }, [url, cacheKey, enabled]);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     if (enabled && !fetchingRef.current) {
-      setLoading(true);
+      // Delete cache entry to force a fresh fetch
+      delete globalCache[cacheKey];
+      setFetchTrigger(prev => prev + 1);
     }
-  };
+  }, [enabled, cacheKey]);
 
   return {
     data,

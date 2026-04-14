@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
-import { unstable_cache } from 'next/cache';
-import { CACHE_TAGS, CACHE_REVALIDATION } from '@/lib/cache';
+
+export const dynamic = 'force-dynamic';
 
 async function getDailyAnalyticsData(daysAgo: number) {
   // Calculate the start and end of the target day
@@ -134,23 +134,12 @@ async function getDailyAnalyticsData(daysAgo: number) {
   return dailyView;
 }
 
-// Create cached version of the function
-const getCachedDailyAnalytics = (daysAgo: number) =>
-  unstable_cache(
-    () => getDailyAnalyticsData(daysAgo),
-    [`daily-analytics-${daysAgo}`],
-    {
-      tags: [CACHE_TAGS.DAILY_ANALYTICS],
-      revalidate: CACHE_REVALIDATION.ANALYTICS,
-    }
-  )();
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const daysAgo = parseInt(searchParams.get('daysAgo') || '0');
 
-    const dailyView = await getCachedDailyAnalytics(daysAgo);
+    const dailyView = await getDailyAnalyticsData(daysAgo);
     return NextResponse.json(dailyView);
   } catch (error) {
     console.error('Daily analytics error:', error);
