@@ -64,19 +64,15 @@ export default function Home() {
   }, [refresh]);
 
   const shouldAutoScan = (data: ItemData[]) => {
-    // Trigger auto-scan if:
-    // 1. No items found
-    // 2. No item has been scanned (all lastScanned are null/undefined)
-    // 3. All items are older than 24 hours
     if (data.length === 0) return true;
 
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const staleThreshold = new Date(now.getTime() - 6 * 60 * 60 * 1000);
 
-    return data.every(item => {
+    return data.some(item => {
       if (!item.lastScanned) return true;
       const lastScannedDate = new Date(item.lastScanned);
-      return lastScannedDate < oneDayAgo;
+      return lastScannedDate < staleThreshold;
     });
   };
 

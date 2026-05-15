@@ -144,9 +144,9 @@ export function useCachedAPI<T>(
   }, [url, cacheKey, enabled]);
 
   const refresh = useCallback(() => {
-    if (enabled && !fetchingRef.current) {
-      // Delete cache entry to force a fresh fetch
+    if (enabled) {
       delete globalCache[cacheKey];
+      delete globalFetchPromises[cacheKey];
       setFetchTrigger(prev => prev + 1);
     }
   }, [enabled, cacheKey]);
