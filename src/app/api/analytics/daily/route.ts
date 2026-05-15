@@ -1,20 +1,16 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
+import { getDayBoundariesInTimezone, getHourInTimezone } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 
 async function getDailyAnalyticsData(daysAgo: number) {
-  // Calculate the start and end of the target day
   const now = new Date();
   const targetDate = new Date(now);
   targetDate.setDate(now.getDate() - daysAgo);
 
-  const dayStart = new Date(targetDate);
-  dayStart.setHours(0, 0, 0, 0);
-
-  const dayEnd = new Date(targetDate);
-  dayEnd.setHours(23, 59, 59, 999);
+  const { start: dayStart, end: dayEnd } = getDayBoundariesInTimezone(targetDate);
 
   const db = new DatabaseService();
   const allItems = await db.getAllItems();
@@ -44,14 +40,7 @@ async function getDailyAnalyticsData(daysAgo: number) {
       if (current.scannedAt >= dayStart && current.scannedAt <= dayEnd) {
         const hourlySales = Math.max(0, current.salesCount - previous.salesCount);
 
-        // Extract hour from timestamp (Melbourne timezone)
-        const hour = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'Australia/Melbourne',
-          hour: 'numeric',
-          hour12: false
-        }).format(current.scannedAt);
-
-        const hourIndex = parseInt(hour);
+        const hourIndex = getHourInTimezone(current.scannedAt);
         if (hourIndex >= 0 && hourIndex < 24) {
           // Track that this hour was scanned
           scannedHours.add(hourIndex);
@@ -61,14 +50,7 @@ async function getDailyAnalyticsData(daysAgo: number) {
       }
     }
 
-    // Create hourly breakdown only for past hours (and current hour)
-    const now = new Date();
-    const currentHour = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Australia/Melbourne',
-      hour: 'numeric',
-      hour12: false
-    }).format(now);
-    const currentHourIndex = parseInt(currentHour);
+    const currentHourIndex = getHourInTimezone(new Date());
 
     // For days other than today, include all 24 hours
     // For today, only include hours up to and including the current hour

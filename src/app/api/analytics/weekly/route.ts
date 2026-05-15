@@ -1,24 +1,23 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
+import { getDayBoundariesInTimezone, getDayOfWeekInTimezone } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 
 async function getWeeklyAnalyticsData(weeksAgo: number) {
-  // Calculate the start and end of the target week
   const now = new Date();
-  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  const daysToMonday = currentDay === 0 ? 6 : currentDay - 1; // Days back to get to Monday
+  const currentDay = getDayOfWeekInTimezone(now);
+  const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
 
-  // Get Monday of the target week
   const targetMonday = new Date(now);
   targetMonday.setDate(now.getDate() - daysToMonday - (weeksAgo * 7));
-  targetMonday.setHours(0, 0, 0, 0);
 
-  // Get Sunday of the target week (end of week)
   const targetSunday = new Date(targetMonday);
   targetSunday.setDate(targetMonday.getDate() + 6);
-  targetSunday.setHours(23, 59, 59, 999);
+
+  const { start: mondayStart } = getDayBoundariesInTimezone(targetMonday);
+  const { end: sundayEnd } = getDayBoundariesInTimezone(targetSunday);
 
   const db = new DatabaseService();
   const allItems = await db.getAllItems();
@@ -40,10 +39,7 @@ async function getWeeklyAnalyticsData(weeksAgo: number) {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dailyBreakdown: Array<{ day: number; dayName: string; sales: number }> = [];
 
-    // For current week (weeksAgo=0), only include days up to today (in Monday-based week)
-    // For past weeks, include all 7 days
-    const melbourneNow = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Melbourne' }));
-    const currentDayOfWeek = melbourneNow.getDay(); // 0=Sunday, 1=Monday, etc.
+    const currentDayOfWeek = currentDay;
 
     // Convert to Monday-based week position: Monday=0, Tuesday=1, ..., Sunday=6
     const currentWeekPosition = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
@@ -69,12 +65,10 @@ async function getWeeklyAnalyticsData(weeksAgo: number) {
       const current = salesHistory[i];
       const previous = salesHistory[i + 1];
 
-      // Check if this record is within our target week
-      if (current.scannedAt >= targetMonday && current.scannedAt <= targetSunday) {
+      if (current.scannedAt >= mondayStart && current.scannedAt <= sundayEnd) {
         const dailySales = Math.max(0, current.salesCount - previous.salesCount);
 
-        // Get day of week in GMT+7
-        const dayOfWeek = current.scannedAt.getDay(); // 0 = Sunday
+        const dayOfWeek = getDayOfWeekInTimezone(current.scannedAt);
 
         // Only add sales if this day is included in our breakdown (for current week, exclude future days)
         const dayEntry = dailyBreakdown.find(d => d.day === dayOfWeek);
@@ -127,8 +121,8 @@ async function getWeeklyAnalyticsData(weeksAgo: number) {
       peakDay,
       peakDaySales,
       growth,
-      weekStart: targetMonday.toISOString(),
-      weekEnd: targetSunday.toISOString()
+      weekStart: mondayStart.toISOString(),
+      weekEnd: sundayEnd.toISOString()
     };
   });
 

@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
+import { getDatePartsInTimezone, getDayBoundariesInTimezone, getDayOfMonthInTimezone } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 
 async function getMonthlyAnalyticsData(monthsAgo: number) {
-  // Calculate the start and end of the target month
   const now = new Date();
-  const targetDate = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+  const nowParts = getDatePartsInTimezone(now);
+  let targetMonth = nowParts.month - monthsAgo;
+  let targetYear = nowParts.year;
+  if (targetMonth < 0) {
+    targetMonth += 12;
+    targetYear -= 1;
+  }
 
-  const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-  monthStart.setHours(0, 0, 0, 0);
+  const monthStartDate = new Date(targetYear, targetMonth, 1);
+  const monthEndDate = new Date(targetYear, targetMonth + 1, 0);
 
-  const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
-  monthEnd.setHours(23, 59, 59, 999);
+  const { start: monthStart } = getDayBoundariesInTimezone(monthStartDate);
+  const { end: monthEnd } = getDayBoundariesInTimezone(monthEndDate);
 
   const db = new DatabaseService();
   const allItems = await db.getAllItems();
@@ -49,8 +55,7 @@ async function getMonthlyAnalyticsData(monthsAgo: number) {
       if (current.scannedAt >= monthStart && current.scannedAt <= monthEnd) {
         const dailySales = Math.max(0, current.salesCount - previous.salesCount);
 
-        // Get day of month (1-based)
-        const dayOfMonth = current.scannedAt.getDate();
+        const dayOfMonth = getDayOfMonthInTimezone(current.scannedAt);
         if (dayOfMonth >= 1 && dayOfMonth <= daysInMonth) {
           dailyBreakdown[dayOfMonth - 1].sales += dailySales;
         }
