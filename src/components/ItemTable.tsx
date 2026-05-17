@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 interface ItemData {
   id: string;
   name: string;
@@ -110,7 +112,12 @@ export function ItemTable({ items }: ItemTableProps) {
                   <td className={`px-6 py-4 sticky left-0 z-10 ${isReference ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-gray-50'}`}>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-gray-900">{item.name}</h3>
+                        <Link
+                          href={`/items/${item.envatoId}`}
+                          className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
+                        >
+                          {item.name}
+                        </Link>
                         {isReference && (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             Reference
