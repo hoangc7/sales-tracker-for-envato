@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 interface ItemData {
   id: string;
   name: string;
@@ -43,14 +45,22 @@ export function ItemCard({ item }: ItemCardProps) {
             <p className="text-xs text-gray-500 mt-1">{item.category}</p>
           )}
         </div>
-        <a 
-          href={item.url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-blue-500 hover:text-blue-700 text-sm"
-        >
-          View Item →
-        </a>
+        <div className="flex flex-col items-end gap-1">
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-700 text-sm"
+          >
+            View Item →
+          </a>
+          <Link
+            href={`/items/${item.envatoId}`}
+            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+          >
+            View Details →
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
