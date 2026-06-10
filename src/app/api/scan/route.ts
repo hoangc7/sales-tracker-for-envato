@@ -56,6 +56,12 @@ export async function POST() {
       }
     }
 
+    // Prune scan history older than 30 days to keep the table small
+    const retentionCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    await prisma.scanHistory.deleteMany({
+      where: { startedAt: { lt: retentionCutoff } }
+    });
+
     // Create new scan record
     const scanRecord = await prisma.scanHistory.create({
       data: {
