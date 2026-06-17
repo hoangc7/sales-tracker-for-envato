@@ -49,9 +49,14 @@ export const TRACKED_ITEMS = [
     envatoId: "54322665",
     url: "https://themeforest.net/item/ecomus-multipurpose-woocommerce-theme/54322665",
   },
+  // {
+  //   name: "Modave",
+  //   envatoId: "58574501",
+  //   url: "https://themeforest.net/item/modave-multipurpose-woocommerce-wordpress-theme/58574501",
+  // },
   {
-    name: "Modave",
-    envatoId: "58574501",
-    url: "https://themeforest.net/item/modave-multipurpose-woocommerce-wordpress-theme/58574501",
+    name: "Milano",
+    envatoId: "63897316",
+    url: "https://themeforest.net/item/milano-multipurpose-woocommerce-wordpress-theme/63897316",
   },
 ];
