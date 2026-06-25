@@ -59,4 +59,9 @@ export const TRACKED_ITEMS = [
     envatoId: "63897316",
     url: "https://themeforest.net/item/milano-multipurpose-woocommerce-wordpress-theme/63897316",
   },
+  {
+    name: "Unimart",
+    envatoId: "63756550",
+    url: "https://themeforest.net/item/unimart-multipurpose-woocommerce-wordpress-theme/63756550",
+  },
 ];
