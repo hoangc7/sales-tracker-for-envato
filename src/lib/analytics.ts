@@ -1,4 +1,11 @@
 import { DatabaseService } from './database';
+import {
+  DEFAULT_TIMEZONE,
+  formatDateKeyInTimezone,
+  formatInTimezone,
+  getDatePartsInTimezone,
+  getWeekBoundariesInTimezone,
+} from './timezone';
 
 export interface HourlySalesData {
   hour: string; // ISO string with hour precision
@@ -54,37 +61,21 @@ export interface ItemAnalytics {
 
 export class AnalyticsService {
   private db: DatabaseService;
-  private readonly GMT7_TIMEZONE = 'Asia/Bangkok';
-
   constructor() {
     this.db = new DatabaseService();
   }
 
-  private toGMT7Date(date: Date): Date {
-    // Convert UTC date to GMT+7 equivalent
-    const utcTime = date.getTime();
-    const gmt7Offset = 7 * 60 * 60 * 1000; // 7 hours in milliseconds
-    return new Date(utcTime + gmt7Offset);
-  }
-
-  private formatGMT7Hour(date: Date): string {
+  // Periods are bucketed in DEFAULT_TIMEZONE, the same boundaries the analytics routes
+  // and lib/sales-periods.ts use, so numbers from here agree with the dashboards.
+  private formatHourKey(date: Date): string {
     return new Intl.DateTimeFormat('en-CA', {
-      timeZone: this.GMT7_TIMEZONE,
+      timeZone: DEFAULT_TIMEZONE,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       hour12: false
     }).format(date).replace(',', '');
-  }
-
-  private formatGMT7Date(date: Date): string {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: this.GMT7_TIMEZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(date);
   }
 
   async getItemAnalytics(itemId: string, days: number = 30): Promise<ItemAnalytics> {
@@ -150,7 +141,7 @@ export class AnalyticsService {
       const hourlySales = Math.max(0, current.salesCount - previous.salesCount);
       
       hourlyData.push({
-        hour: this.formatGMT7Hour(current.scannedAt),
+        hour: this.formatHourKey(current.scannedAt),
         hourlySales,
         totalSales: current.salesCount,
         price: current.price ?? undefined
@@ -208,131 +199,102 @@ export class AnalyticsService {
     return dailyData.sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  private calculateDailyData(salesHistory: Array<{salesCount: number; scannedAt: Date; price?: number | null}>): DailySalesData[] {
-    const dailyData: DailySalesData[] = [];
-    
+  private calculateWeeklyData(salesHistory: Array<{salesCount: number; scannedAt: Date; price?: number | null}>): WeeklySalesData[] {
+    const weeks = new Map<string, {
+      weekStart: string;
+      weekEnd: string;
+      weeklySales: number;
+      totalSales: number;
+      prices: number[];
+    }>();
+
+    // salesHistory is newest-first. Each scan's delta is attributed to that scan's
+    // timestamp and summed into its Mon-Sun week, matching lib/sales-periods.ts. The
+    // previous "last - first record in the week" approach silently dropped the sales
+    // made between the last scan of one week and the first scan of the next.
     for (let i = 0; i < salesHistory.length - 1; i++) {
       const current = salesHistory[i];
-      const previous = salesHistory[i + 1];
-      const dailySales = Math.max(0, current.salesCount - previous.salesCount);
-      
-      dailyData.push({
-        date: this.formatGMT7Date(current.scannedAt),
-        dailySales,
-        totalSales: current.salesCount,
-        price: current.price ?? undefined,
-        hourlyBreakdown: [] // Empty for backward compatibility
-      });
+      const delta = Math.max(0, current.salesCount - salesHistory[i + 1].salesCount);
+
+      const { start, end } = getWeekBoundariesInTimezone(current.scannedAt);
+      const key = formatDateKeyInTimezone(start);
+
+      let week = weeks.get(key);
+      if (!week) {
+        week = {
+          weekStart: key,
+          weekEnd: formatDateKeyInTimezone(end),
+          weeklySales: 0,
+          totalSales: 0,
+          prices: []
+        };
+        weeks.set(key, week);
+      }
+
+      week.weeklySales += delta;
+      week.totalSales = Math.max(week.totalSales, current.salesCount);
+      if (current.price) week.prices.push(current.price);
     }
 
-    return dailyData.reverse(); // Oldest first
-  }
-
-  private calculateWeeklyData(salesHistory: Array<{salesCount: number; scannedAt: Date; price?: number | null}>): WeeklySalesData[] {
-    const weeklyMap = new Map<string, {weekStart: string; weekEnd: string; records: Array<{salesCount: number; scannedAt: Date; price?: number | null}>}>();
-    
-    salesHistory.forEach(record => {
-      const date = new Date(record.scannedAt);
-      const weekStart = this.getWeekStart(date);
-      const weekKey = weekStart.toISOString().split('T')[0];
-      
-      if (!weeklyMap.has(weekKey)) {
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        
-        weeklyMap.set(weekKey, {
-          weekStart: weekKey,
-          weekEnd: weekEnd.toISOString().split('T')[0],
-          records: []
-        });
-      }
-      
-      weeklyMap.get(weekKey)!.records.push(record);
-    });
-
-    const weeklyData: WeeklySalesData[] = [];
-    
-    for (const [, weekData] of weeklyMap.entries()) {
-      const sortedRecords = weekData.records.sort((a, b) => 
-        new Date(a.scannedAt).getTime() - new Date(b.scannedAt).getTime()
-      );
-      
-      if (sortedRecords.length >= 2) {
-        const firstRecord = sortedRecords[0];
-        const lastRecord = sortedRecords[sortedRecords.length - 1];
-        const weeklySales = Math.max(0, lastRecord.salesCount - firstRecord.salesCount);
-        
-        const recordsWithPrice = sortedRecords.filter(r => r.price);
-        const avgPrice = recordsWithPrice.length > 0 ? 
-          recordsWithPrice.reduce((sum, r) => sum + r.price!, 0) / recordsWithPrice.length : undefined;
-
-        weeklyData.push({
-          weekStart: weekData.weekStart,
-          weekEnd: weekData.weekEnd,
-          weeklySales,
-          totalSales: lastRecord.salesCount,
-          averagePrice: avgPrice || undefined
-        });
-      }
-    }
-
-    return weeklyData.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+    return Array.from(weeks.values())
+      .map(week => ({
+        weekStart: week.weekStart,
+        weekEnd: week.weekEnd,
+        weeklySales: week.weeklySales,
+        totalSales: week.totalSales,
+        averagePrice: week.prices.length > 0
+          ? week.prices.reduce((sum, price) => sum + price, 0) / week.prices.length
+          : undefined
+      }))
+      .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
   }
 
   private calculateMonthlyData(salesHistory: Array<{salesCount: number; scannedAt: Date; price?: number | null}>): MonthlySalesData[] {
-    const monthlyMap = new Map<string, {month: string; year: number; records: Array<{salesCount: number; scannedAt: Date; price?: number | null}>}>();
-    
-    salesHistory.forEach(record => {
-      const date = new Date(record.scannedAt);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
-      if (!monthlyMap.has(monthKey)) {
-        monthlyMap.set(monthKey, {
-          month: date.toLocaleDateString('en-US', { month: 'long' }),
-          year: date.getFullYear(),
-          records: []
-        });
-      }
-      
-      monthlyMap.get(monthKey)!.records.push(record);
-    });
+    const months = new Map<string, {
+      month: string;
+      year: number;
+      monthlySales: number;
+      totalSales: number;
+      prices: number[];
+    }>();
 
-    const monthlyData: MonthlySalesData[] = [];
-    
-    for (const [, monthData] of monthlyMap.entries()) {
-      const sortedRecords = monthData.records.sort((a, b) => 
-        new Date(a.scannedAt).getTime() - new Date(b.scannedAt).getTime()
-      );
-      
-      if (sortedRecords.length >= 2) {
-        const firstRecord = sortedRecords[0];
-        const lastRecord = sortedRecords[sortedRecords.length - 1];
-        const monthlySales = Math.max(0, lastRecord.salesCount - firstRecord.salesCount);
-        
-        const recordsWithPrice = sortedRecords.filter(r => r.price);
-        const avgPrice = recordsWithPrice.length > 0 ? 
-          recordsWithPrice.reduce((sum, r) => sum + r.price!, 0) / recordsWithPrice.length : undefined;
+    // Same delta-attribution as the weekly aggregation above, bucketed by calendar month
+    // in DEFAULT_TIMEZONE rather than by the process clock's getMonth()/getFullYear().
+    for (let i = 0; i < salesHistory.length - 1; i++) {
+      const current = salesHistory[i];
+      const delta = Math.max(0, current.salesCount - salesHistory[i + 1].salesCount);
 
-        monthlyData.push({
-          month: monthData.month,
-          year: monthData.year,
-          monthlySales,
-          totalSales: lastRecord.salesCount,
-          averagePrice: avgPrice || undefined
-        });
+      const { year, month } = getDatePartsInTimezone(current.scannedAt);
+      const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+      let entry = months.get(key);
+      if (!entry) {
+        entry = {
+          month: formatInTimezone(current.scannedAt, { month: 'long' }),
+          year,
+          monthlySales: 0,
+          totalSales: 0,
+          prices: []
+        };
+        months.set(key, entry);
       }
+
+      entry.monthlySales += delta;
+      entry.totalSales = Math.max(entry.totalSales, current.salesCount);
+      if (current.price) entry.prices.push(current.price);
     }
 
-    return monthlyData.sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return new Date(`${a.month} 1, ${a.year}`).getMonth() - new Date(`${b.month} 1, ${b.year}`).getMonth();
-    });
-  }
-
-  private getWeekStart(date: Date): Date {
-    const day = date.getDay();
-    const diff = date.getDate() - day;
-    return new Date(date.setDate(diff));
+    return Array.from(months.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, entry]) => ({
+        month: entry.month,
+        year: entry.year,
+        monthlySales: entry.monthlySales,
+        totalSales: entry.totalSales,
+        averagePrice: entry.prices.length > 0
+          ? entry.prices.reduce((sum, price) => sum + price, 0) / entry.prices.length
+          : undefined
+      }));
   }
 
   private calculateGrowthRate(data: Array<{hourlySales?: number; dailySales?: number; weeklySales?: number; monthlySales?: number}>, type: 'hourly' | 'daily' | 'weekly' | 'monthly'): number {

@@ -18,7 +18,8 @@ ThemeForest Sales Tracker built with Next.js 15, TypeScript, TailwindCSS 4, and 
 | Database | PostgreSQL (Prisma ORM) |
 | Language | TypeScript 5 |
 | Node Runtime TZ | `TZ=Australia/Melbourne` in npm scripts only — Vercel runs UTC |
-| Display TZ | Asia/Bangkok (GMT+7) used in analytics calculations |
+| Period boundary TZ | Australia/Melbourne (`DEFAULT_TIMEZONE`) |
+| Timestamp display TZ | Asia/Bangkok, GMT+7 (`DISPLAY_TIMEZONE`) |
 
 ## Architecture
 
@@ -146,7 +147,11 @@ Returns the oldest/newest scan timestamps; used to disable "previous" navigation
 
 ### Timezone Handling
 - **Server clock**: `TZ=Australia/Melbourne` is set by the npm scripts, but **Vercel functions run in UTC** — `vercel.json` sets no `TZ`. Never assume the process clock is Melbourne in code that ships.
-- **Display timezone**: Asia/Bangkok (GMT+7) — `lib/timezone.ts` functions convert UTC dates for analytics grouping
+- **Two timezones, two jobs** — both live in `lib/timezone.ts`:
+  - `DEFAULT_TIMEZONE` (Australia/Melbourne) defines **period boundaries**: which day/week/month a scan belongs to. Every aggregation *and every period label* uses it.
+  - `DISPLAY_TIMEZONE` (Asia/Bangkok, GMT+7) renders **instants**, e.g. "last scanned at".
+  - Never label a period with `DISPLAY_TIMEZONE` — Melbourne Monday 00:00 is Sunday 21:00 in GMT+7, so the label lands on the wrong bucket.
+- **Client components must format dates with an explicit timezone.** APIs return boundaries as ISO instants; a bare `toLocaleDateString()`/`getMonth()` resolves in the *viewer's* clock and shifts labels onto neighbouring days or months. Use `formatInTimezone` (periods) and `formatTimestamp` (instants) instead — never raw `Date` getters on a boundary value.
 - When adding date logic, always use `timezone.ts` helpers; never rely on `getHours()`, `getDate()`, `setHours()` or `toLocaleString()` round-trips, which all silently follow the process clock and produce different results locally vs. on Vercel
 - Day and week boundaries come from `getDayBoundariesInTimezone` / `getWeekBoundariesInTimezone`; every dashboard must use the same ones or its totals will disagree with the other tabs
 
@@ -203,6 +208,6 @@ The scanner will create the DB row automatically on next scan via `initializeDat
 | `/src/lib/envato-api.ts` | Envato API v3 client |
 | `/src/lib/analytics.ts` | All sales aggregation logic |
 | `/src/lib/sales-periods.ts` | Shared day/range aggregation used by Overview + analytics routes |
-| `/src/lib/timezone.ts` | Timezone helpers (use these, not raw Date methods) |
+| `/src/lib/timezone.ts` | Timezone helpers + formatters (use these, not raw Date methods, on server **and** client) |
 | `/src/hooks/useCachedAPI.ts` | Client caching — modify carefully to avoid stale data bugs |
 | `vercel.json` | Deployment config |

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatTimestamp } from '@/lib/timezone';
 
 interface ItemData {
   id: string;
@@ -26,14 +27,9 @@ interface ItemTableProps {
 }
 
 export function ItemTable({ items }: ItemTableProps) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // Instant, not a period boundary — rendered in the display timezone so "Last Scanned"
+  // reads the same here as it does on the Daily/Weekly/Monthly tabs.
+  const formatDate = (dateString: string) => formatTimestamp(dateString);
 
   // `date` is a YYYY-MM-DD calendar day in the tracking timezone — render it as UTC so
   // the viewer's own timezone can never shift the label onto a neighbouring day.

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
-import { getDatePartsInTimezone, getDayBoundariesInTimezone, getDayOfMonthInTimezone } from '@/lib/timezone';
+import { getDatePartsInTimezone, getDayBoundariesInTimezone, getDayOfMonthInTimezone, getDaysInMonthOf } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,11 +15,18 @@ async function getMonthlyAnalyticsData(monthsAgo: number) {
     targetYear -= 1;
   }
 
-  const monthStartDate = new Date(targetYear, targetMonth, 1);
-  const monthEndDate = new Date(targetYear, targetMonth + 1, 0);
+  // Built in UTC, then snapped to the tracking timezone's day boundaries. Using the
+  // local-time Date constructor here would resolve against the process clock, which is
+  // Melbourne locally but UTC on Vercel.
+  const monthStartDate = new Date(Date.UTC(targetYear, targetMonth, 1, 12));
+  const monthEndDate = new Date(Date.UTC(targetYear, targetMonth + 1, 0, 12));
 
   const { start: monthStart } = getDayBoundariesInTimezone(monthStartDate);
   const { end: monthEnd } = getDayBoundariesInTimezone(monthEndDate);
+
+  // Days in the target month, resolved in the tracking timezone rather than via
+  // monthEnd.getDate(), which reads the process clock.
+  const daysInMonth = getDaysInMonthOf(monthStartDate);
 
   const db = new DatabaseService();
   const allItems = await db.getAllItems();
@@ -36,9 +43,6 @@ async function getMonthlyAnalyticsData(monthsAgo: number) {
   const monthlyView = items.map((item) => {
     // Get sales history for this item from the batch result
     const salesHistory = batchSalesHistory.get(item.id) || [];
-
-    // Get number of days in the target month
-    const daysInMonth = monthEnd.getDate();
 
     // Initialize daily breakdown for the month (1-based day numbers)
     const dailyBreakdown = Array.from({ length: daysInMonth }, (_, index) => ({
