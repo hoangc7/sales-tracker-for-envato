@@ -22,6 +22,7 @@ interface ItemData {
   weeklySales: number;
   dailySales: Array<{
     date: string;
+    dayStart: string;
     dailySales: number;
     totalSales: number;
   }>;

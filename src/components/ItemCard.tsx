@@ -15,6 +15,7 @@ interface ItemData {
   weeklySales: number;
   dailySales: Array<{
     date: string;
+    dayStart: string;
     dailySales: number;
     totalSales: number;
   }>;
@@ -27,6 +28,17 @@ interface ItemCardProps {
 export function ItemCard({ item }: ItemCardProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
+  };
+
+  // `date` is a YYYY-MM-DD calendar day in the tracking timezone — render it as UTC so
+  // the viewer's own timezone can never shift the label onto a neighbouring day.
+  const formatDay = (dateKey: string) => {
+    return new Date(`${dateKey}T00:00:00Z`).toLocaleDateString('en-US', {
+      timeZone: 'UTC',
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   const formatPrice = (price?: number) => {
@@ -95,7 +107,7 @@ export function ItemCard({ item }: ItemCardProps) {
           <div className="space-y-1">
             {item.dailySales.slice(0, 3).map((day, index) => (
               <div key={index} className="flex justify-between text-sm">
-                <span className="text-gray-600">{formatDate(day.date)}</span>
+                <span className="text-gray-600">{formatDay(day.date)}</span>
                 <span className="font-medium text-green-600">+{day.dailySales}</span>
               </div>
             ))}

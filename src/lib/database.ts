@@ -92,25 +92,6 @@ export class DatabaseService {
     });
   }
 
-  async getDailySales(itemId: string, days = 7) {
-    const records = await this.getSalesHistory(itemId, days);
-
-    const dailySales = [];
-    for (let i = 0; i < records.length - 1; i++) {
-      const current = records[i];
-      const previous = records[i + 1];
-      const dailySale = current.salesCount - previous.salesCount;
-
-      dailySales.push({
-        date: current.scannedAt,
-        dailySales: Math.max(0, dailySale),
-        totalSales: current.salesCount,
-      });
-    }
-
-    return dailySales;
-  }
-
   async getOldestSaleRecord() {
     return prisma.salesRecord.findFirst({
       orderBy: { scannedAt: 'asc' },

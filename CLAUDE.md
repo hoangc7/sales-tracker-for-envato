@@ -17,7 +17,7 @@ ThemeForest Sales Tracker built with Next.js 15, TypeScript, TailwindCSS 4, and 
 | Backend | Next.js API Routes |
 | Database | PostgreSQL (Prisma ORM) |
 | Language | TypeScript 5 |
-| Node Runtime TZ | `TZ=Australia/Melbourne` (enforced in all npm scripts) |
+| Node Runtime TZ | `TZ=Australia/Melbourne` in npm scripts only — Vercel runs UTC |
 | Display TZ | Asia/Bangkok (GMT+7) used in analytics calculations |
 
 ## Architecture
@@ -60,6 +60,7 @@ src/
 │   ├── scanner.ts                  # Batch scan orchestration
 │   ├── database.ts                 # Prisma CRUD + sales delta calculations
 │   ├── analytics.ts                # Hourly/daily/weekly/monthly aggregations
+│   ├── sales-periods.ts            # Shared per-day/per-range delta aggregation
 │   ├── timezone.ts                 # Timezone utility functions
 │   └── cache.ts                    # Cache tags and revalidation config
 └── config/
@@ -78,7 +79,7 @@ npm run db:migrate # Create and apply a Prisma migration
 npm run db:generate # Regenerate Prisma client
 ```
 
-`TZ=Australia/Melbourne` is prepended to every script — never remove it as all date boundary calculations depend on the server clock being in Melbourne time.
+`TZ=Australia/Melbourne` is prepended to every script so local runs match production behaviour. It is **not** a guarantee the code can rely on: Vercel functions run in UTC. Date boundary logic must derive its timezone explicitly via `lib/timezone.ts` rather than depending on the process clock.
 
 ## Environment Variables
 
@@ -121,7 +122,13 @@ Triggers a scan of all tracked items. Rate-limited:
 Returns scan health metrics: current status, last successful scan, total/success/failed counts, and last 10 scan records.
 
 ### `GET /api/items`
-All tracked items with `latestSales`, `latestPrice`, `lastScanned`, `weeklySales` (current Mon–Sun calendar week), and `dailySales` (7-day array).
+All tracked items — returned in `config/items.ts` order, so `items[0]` is always the reference item — with `latestSales`, `latestPrice`, `lastScanned`, `weeklySales` (current Mon–Sun calendar week), and `dailySales`.
+
+`dailySales` is one entry **per calendar day** (up to 7, newest first), not per scan:
+`{ date: 'YYYY-MM-DD', dayStart: ISO, dailySales, totalSales }`. Days with no scan data are
+omitted rather than reported as zero. Both fields are derived by `lib/sales-periods.ts` using the
+same day/week boundaries as the analytics routes, so the Overview always agrees with the
+Daily/Weekly tabs.
 
 ### `GET /api/analytics/daily?daysAgo=N`
 24-hour breakdown. `daysAgo=0` is today (Melbourne time). Returns per-item `hourlyBreakdown[24]`, `totalDailySales`, `peakHour`, `peakHourSales`, `growth`, `dayStart`, `dayEnd`.
@@ -138,9 +145,10 @@ Returns the oldest/newest scan timestamps; used to disable "previous" navigation
 ## Key Conventions
 
 ### Timezone Handling
-- **Server clock**: `TZ=Australia/Melbourne` — all `new Date()` calls reflect Melbourne time
+- **Server clock**: `TZ=Australia/Melbourne` is set by the npm scripts, but **Vercel functions run in UTC** — `vercel.json` sets no `TZ`. Never assume the process clock is Melbourne in code that ships.
 - **Display timezone**: Asia/Bangkok (GMT+7) — `lib/timezone.ts` functions convert UTC dates for analytics grouping
-- When adding date logic, always use `timezone.ts` helpers; never rely on `getHours()` directly
+- When adding date logic, always use `timezone.ts` helpers; never rely on `getHours()`, `getDate()`, `setHours()` or `toLocaleString()` round-trips, which all silently follow the process clock and produce different results locally vs. on Vercel
+- Day and week boundaries come from `getDayBoundariesInTimezone` / `getWeekBoundariesInTimezone`; every dashboard must use the same ones or its totals will disagree with the other tabs
 
 ### Sales Delta Calculation
 Raw data is cumulative. The pattern everywhere is:
@@ -194,6 +202,7 @@ The scanner will create the DB row automatically on next scan via `initializeDat
 | `/prisma/schema.prisma` | Database schema |
 | `/src/lib/envato-api.ts` | Envato API v3 client |
 | `/src/lib/analytics.ts` | All sales aggregation logic |
+| `/src/lib/sales-periods.ts` | Shared day/range aggregation used by Overview + analytics routes |
 | `/src/lib/timezone.ts` | Timezone helpers (use these, not raw Date methods) |
 | `/src/hooks/useCachedAPI.ts` | Client caching — modify carefully to avoid stale data bugs |
 | `vercel.json` | Deployment config |

@@ -1,23 +1,15 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
-import { getDayBoundariesInTimezone, getDayOfWeekInTimezone } from '@/lib/timezone';
+import { getDayOfWeekInTimezone, getWeekBoundariesInTimezone } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 
 async function getWeeklyAnalyticsData(weeksAgo: number) {
   const now = new Date();
   const currentDay = getDayOfWeekInTimezone(now);
-  const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
 
-  const targetMonday = new Date(now);
-  targetMonday.setDate(now.getDate() - daysToMonday - (weeksAgo * 7));
-
-  const targetSunday = new Date(targetMonday);
-  targetSunday.setDate(targetMonday.getDate() + 6);
-
-  const { start: mondayStart } = getDayBoundariesInTimezone(targetMonday);
-  const { end: sundayEnd } = getDayBoundariesInTimezone(targetSunday);
+  const { start: mondayStart, end: sundayEnd } = getWeekBoundariesInTimezone(now, weeksAgo);
 
   const db = new DatabaseService();
   const allItems = await db.getAllItems();

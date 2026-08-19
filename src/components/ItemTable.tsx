@@ -15,6 +15,7 @@ interface ItemData {
   weeklySales: number;
   dailySales: Array<{
     date: string;
+    dayStart: string;
     dailySales: number;
     totalSales: number;
   }>;
@@ -31,6 +32,17 @@ export function ItemTable({ items }: ItemTableProps) {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
+    });
+  };
+
+  // `date` is a YYYY-MM-DD calendar day in the tracking timezone — render it as UTC so
+  // the viewer's own timezone can never shift the label onto a neighbouring day.
+  const formatDay = (dateKey: string) => {
+    return new Date(`${dateKey}T00:00:00Z`).toLocaleDateString('en-US', {
+      timeZone: 'UTC',
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
     });
   };
 
@@ -91,6 +103,7 @@ export function ItemTable({ items }: ItemTableProps) {
               </th>
               <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900 min-w-[200px]">
                 Recent Daily Sales
+                <span className="block text-xs font-normal text-gray-500">Last 3 days</span>
               </th>
               <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900 min-w-[140px]">
                 Last Scanned
@@ -184,7 +197,7 @@ export function ItemTable({ items }: ItemTableProps) {
                       {getRecentDailySales(item.dailySales).map((day, dayIndex) => (
                         <div key={dayIndex} className="flex justify-between items-center text-sm">
                           <span className="text-gray-600">
-                            {formatDate(day.date)}
+                            {formatDay(day.date)}
                           </span>
                           <span className="font-medium text-green-600">
                             +{day.dailySales}

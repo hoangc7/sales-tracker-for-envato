@@ -1,90 +1,83 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 import { TRACKED_ITEMS } from '@/config/items';
+import { getWeekBoundariesInTimezone } from '@/lib/timezone';
+import { getDailySalesTotals, sumSalesInRange } from '@/lib/sales-periods';
+
+export const dynamic = 'force-dynamic';
+
+const DAILY_SALES_DAYS = 7;
+// Covers both windows we report on (the last 7 calendar days and the current Mon–Sun
+// week, which starts at most ~7 days back) plus a margin, so the scan preceding the
+// oldest reported day is always available to compute that day's first delta.
+const HISTORY_DAYS = 10;
+
+function emptyItem(item: (typeof TRACKED_ITEMS)[number]) {
+  return {
+    id: null,
+    name: item.name,
+    url: item.url,
+    envatoId: item.envatoId,
+    author: null,
+    category: null,
+    latestSales: 0,
+    latestPrice: null,
+    lastScanned: null,
+    weeklySales: 0,
+    dailySales: [],
+  };
+}
 
 export async function GET() {
   try {
     const db = new DatabaseService();
     const allItems = await db.getAllItems();
-    
-    // If no items exist, return items from config with empty stats
-    if (allItems.length === 0) {
-      const emptyItems = TRACKED_ITEMS.map(item => ({
-        id: null,
+
+    // Only show items in the current config, ordered exactly as configured so the
+    // reference item (first row) is stable and matches the other dashboards.
+    const items = TRACKED_ITEMS.map(configItem =>
+      allItems.find(item => item.url === configItem.url)
+    );
+
+    const trackedItems = items.filter(item => item !== undefined);
+
+    if (trackedItems.length === 0) {
+      return NextResponse.json(TRACKED_ITEMS.map(emptyItem));
+    }
+
+    // Single batched query for every item's history, same as the analytics routes.
+    const batchSalesHistory = await db.getBatchSalesHistory(
+      trackedItems.map(item => item.id),
+      HISTORY_DAYS
+    );
+
+    const now = new Date();
+    const { start: weekStart, end: weekEnd } = getWeekBoundariesInTimezone(now);
+
+    const itemsWithStats = TRACKED_ITEMS.map((configItem, index) => {
+      const item = items[index];
+      if (!item) return emptyItem(configItem);
+
+      const salesHistory = batchSalesHistory.get(item.id) || [];
+
+      return {
+        id: item.id,
         name: item.name,
         url: item.url,
         envatoId: item.envatoId,
-        author: null,
-        category: null,
-        latestSales: 0,
-        latestPrice: null,
-        lastScanned: null,
-        weeklySales: 0,
-        dailySales: [],
-      }));
-      return NextResponse.json(emptyItems);
-    }
-    
-    // Filter items to only show those in current config
-    const configUrls = TRACKED_ITEMS.map(item => item.url);
-    const items = allItems.filter(item => configUrls.includes(item.url));
-    
-    // Add missing items from config with empty stats
-    const existingUrls = items.map(item => item.url);
-    const missingItems = TRACKED_ITEMS.filter(item => !existingUrls.includes(item.url));
-    
-    const itemsWithStats = await Promise.all(
-      items.map(async (item) => {
-        const dailySales = await db.getDailySales(item.id, 7);
+        author: item.author,
+        category: item.category,
+        latestSales: item.salesRecords[0]?.salesCount || 0,
+        latestPrice: item.salesRecords[0]?.price ?? null,
+        lastScanned: item.salesRecords[0]?.scannedAt ?? null,
+        // Current Monday–Sunday calendar week, identical boundaries to /api/analytics/weekly
+        weeklySales: sumSalesInRange(salesHistory, weekStart, weekEnd),
+        // Per calendar day (newest first), not per scan interval
+        dailySales: getDailySalesTotals(salesHistory, DAILY_SALES_DAYS, now),
+      };
+    });
 
-        // Calculate weekly sales for current calendar week (Monday-Sunday) in Melbourne timezone
-        const now = new Date();
-        const melbourneNow = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Melbourne' }));
-        const currentDay = melbourneNow.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const daysToMonday = currentDay === 0 ? 6 : currentDay - 1; // Days back to get to Monday
-
-        // Get Monday of current week (in Melbourne timezone)
-        const currentMonday = new Date(melbourneNow);
-        currentMonday.setDate(melbourneNow.getDate() - daysToMonday);
-        currentMonday.setHours(0, 0, 0, 0);
-
-        // Calculate weekly sales only for current week
-        const weeklySales = dailySales
-          .filter(day => day.date >= currentMonday)
-          .reduce((sum, day) => sum + day.dailySales, 0);
-        
-        return {
-          id: item.id,
-          name: item.name,
-          url: item.url,
-          envatoId: item.envatoId,
-          author: item.author,
-          category: item.category,
-          latestSales: item.salesRecords[0]?.salesCount || 0,
-          latestPrice: item.salesRecords[0]?.price,
-          lastScanned: item.salesRecords[0]?.scannedAt,
-          weeklySales,
-          dailySales,
-        };
-      })
-    );
-    
-    // Add missing items with empty stats
-    const missingItemsWithStats = missingItems.map(item => ({
-      id: null,
-      name: item.name,
-      url: item.url,
-      envatoId: item.envatoId,
-      author: null,
-      category: null,
-      latestSales: 0,
-      latestPrice: null,
-      lastScanned: null,
-      weeklySales: 0,
-      dailySales: [],
-    }));
-    
-    return NextResponse.json([...itemsWithStats, ...missingItemsWithStats]);
+    return NextResponse.json(itemsWithStats);
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 });

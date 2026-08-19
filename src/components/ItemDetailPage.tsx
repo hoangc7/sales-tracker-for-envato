@@ -26,7 +26,7 @@ interface ItemData {
   latestPrice?: number;
   lastScanned?: string;
   weeklySales: number;
-  dailySales: Array<{ date: string; dailySales: number; totalSales: number }>;
+  dailySales: Array<{ date: string; dayStart: string; dailySales: number; totalSales: number }>;
 }
 
 interface HourlyBreakdown {
