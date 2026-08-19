@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { formatInTimezone, formatTimestamp } from '@/lib/timezone';
 
 interface DailyBreakdown {
   day: number; // 0=Sunday, 1=Monday, ... 6=Saturday
@@ -85,15 +86,14 @@ export function WeeklyDashboard() {
     return 'text-gray-600';
   };
 
+  // weekStart/weekEnd are Melbourne day boundaries — format them in that timezone,
+  // otherwise the viewer's own clock shifts the range onto the wrong calendar days.
   const formatWeekRange = (weekStart: string, weekEnd: string) => {
-    const start = new Date(weekStart);
-    const end = new Date(weekEnd);
-
-    const startStr = start.toLocaleDateString('en-US', {
+    const startStr = formatInTimezone(weekStart, {
       month: 'short',
       day: 'numeric'
     });
-    const endStr = end.toLocaleDateString('en-US', {
+    const endStr = formatInTimezone(weekEnd, {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
@@ -273,13 +273,7 @@ export function WeeklyDashboard() {
                             📊 Growth: {item.growth > 0 ? '+' : ''}{item.growth.toFixed(1)}%
                           </div>
                           {item.lastScanned && (
-                            <div>🕐 Last: {new Date(item.lastScanned).toLocaleString('en-US', {
-                              timeZone: 'Asia/Bangkok',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}</div>
+                            <div>🕐 Last: {formatTimestamp(item.lastScanned)}</div>
                           )}
                         </div>
 

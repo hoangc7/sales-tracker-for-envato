@@ -12,6 +12,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { formatInTimezone, formatTimestamp, getDaysInMonthOf } from '@/lib/timezone';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ interface ItemData {
   latestPrice?: number;
   lastScanned?: string;
   weeklySales: number;
-  dailySales: Array<{ date: string; dailySales: number; totalSales: number }>;
+  dailySales: Array<{ date: string; dayStart: string; dailySales: number; totalSales: number }>;
 }
 
 interface HourlyBreakdown {
@@ -184,8 +185,9 @@ function DailySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: 
   const dayLabel =
     daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} Days Ago`;
 
+  // dayStart is a Melbourne day boundary — label it in that timezone, not the viewer's.
   const dateLabel = item?.dayStart
-    ? new Date(item.dayStart).toLocaleDateString('en-US', {
+    ? formatInTimezone(item.dayStart, {
         weekday: 'short',
         year: 'numeric',
         month: 'short',
@@ -295,8 +297,8 @@ function WeeklySection({ envatoId, oldestDate }: { envatoId: string; oldestDate:
   const weekRange =
     item?.weekStart && item?.weekEnd
       ? (() => {
-          const s = new Date(item.weekStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const e = new Date(item.weekEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          const s = formatInTimezone(item.weekStart, { month: 'short', day: 'numeric' });
+          const e = formatInTimezone(item.weekEnd, { month: 'short', day: 'numeric', year: 'numeric' });
           return `${s} – ${e}`;
         })()
       : '';
@@ -398,12 +400,14 @@ function MonthlySection({ envatoId, oldestDate }: { envatoId: string; oldestDate
     monthsAgo === 0 ? 'This Month' : monthsAgo === 1 ? 'Last Month' : `${monthsAgo} Months Ago`;
 
   const monthName = item?.monthStart
-    ? new Date(item.monthStart).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+    ? formatInTimezone(item.monthStart, { year: 'numeric', month: 'long' })
     : '';
 
   // Build day-by-day chart data
+  // Resolve the month in the tracking timezone; the viewer's clock can put monthStart in
+  // the previous month and size the chart to the wrong number of days.
   const daysInMonth = item?.monthStart
-    ? new Date(new Date(item.monthStart).getFullYear(), new Date(item.monthStart).getMonth() + 1, 0).getDate()
+    ? getDaysInMonthOf(new Date(item.monthStart))
     : 31;
 
   const chartData = Array.from({ length: daysInMonth }, (_, i) => ({
@@ -576,15 +580,7 @@ export function ItemDetailPage({ envatoId }: { envatoId: string }) {
             <div className="text-center">
               <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Last Scanned</p>
               <p className="text-sm font-medium text-gray-700 mt-1">
-                {item.lastScanned
-                  ? new Date(item.lastScanned).toLocaleString('en-US', {
-                      timeZone: 'Asia/Bangkok',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  : 'Never'}
+                {item.lastScanned ? formatTimestamp(item.lastScanned) : 'Never'}
               </p>
             </div>
           </div>

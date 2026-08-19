@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { formatInTimezone, formatTimestamp, getMonthInTimezone } from '@/lib/timezone';
 
 interface DailyBreakdown {
   day: number; // 1-31 (day of month)
@@ -83,10 +84,10 @@ export function MonthlyDashboard() {
     return 'text-gray-600';
   };
 
+  // monthStart is a Melbourne day boundary — format it in that timezone, otherwise the
+  // viewer's own clock shifts the label onto the previous month.
   const formatMonthRange = (monthStart: string) => {
-    const start = new Date(monthStart);
-
-    return start.toLocaleDateString('en-US', {
+    return formatInTimezone(monthStart, {
       year: 'numeric',
       month: 'long'
     });
@@ -225,7 +226,9 @@ export function MonthlyDashboard() {
             <tbody className="divide-y divide-gray-200">
               {sortedItems.map((item, index) => {
                 // Get the actual month index from the monthStart date
-                const currentMonthIndex = new Date(item.monthStart).getMonth(); // 0=Jan, 1=Feb, ..., 11=Dec
+                // Melbourne month — new Date(monthStart).getMonth() would resolve in the
+                // viewer's timezone and drop the whole month into the previous column.
+                const currentMonthIndex = getMonthInTimezone(new Date(item.monthStart)); // 0=Jan, ..., 11=Dec
 
                 // Create array with sales for each month (0=Jan, 1=Feb, ..., 11=Dec)
                 const monthlySales = new Array(12).fill(0);
@@ -261,13 +264,7 @@ export function MonthlyDashboard() {
                             📊 Growth: {item.growth > 0 ? '+' : ''}{item.growth.toFixed(1)}%
                           </div>
                           {item.lastScanned && (
-                            <div>🕐 Last: {new Date(item.lastScanned).toLocaleString('en-US', {
-                              timeZone: 'Asia/Bangkok',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}</div>
+                            <div>🕐 Last: {formatTimestamp(item.lastScanned)}</div>
                           )}
                         </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { formatInTimezone, formatTimestamp } from '@/lib/timezone';
 
 interface HourlyBreakdown {
   hour: number; // 0-23
@@ -82,9 +83,10 @@ export function DailyDashboard() {
     return 'text-gray-600';
   };
 
+  // dayStart is a Melbourne day boundary — format it in that timezone, otherwise the
+  // viewer's own clock shifts the label onto the previous/next calendar day.
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
+    return formatInTimezone(dateStr, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -258,13 +260,7 @@ export function DailyDashboard() {
                             📊 Growth: {item.growth > 0 ? '+' : ''}{item.growth.toFixed(1)}%
                           </div>
                           {item.lastScanned && (
-                            <div>🕐 Last: {new Date(item.lastScanned).toLocaleString('en-US', {
-                              timeZone: 'Asia/Bangkok',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}</div>
+                            <div>🕐 Last: {formatTimestamp(item.lastScanned)}</div>
                           )}
                         </div>
 
