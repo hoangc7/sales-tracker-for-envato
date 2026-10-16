@@ -1,33 +1,36 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
-    // Get recent scan history
-    const recentScans = await prisma.scanHistory.findMany({
-      orderBy: { startedAt: 'desc' },
-      take: 10
-    });
-
-    // Get current status
-    const runningScan = await prisma.scanHistory.findFirst({
-      where: { status: 'RUNNING' },
-      orderBy: { startedAt: 'desc' }
-    });
-
-    const lastSuccessfulScan = await prisma.scanHistory.findFirst({
-      where: { status: 'COMPLETED' },
-      orderBy: { completedAt: 'desc' }
-    });
+    // Independent queries — run them in parallel instead of six sequential round trips.
+    const [recentScans, runningScan, lastSuccessfulScan, statusCounts] = await Promise.all([
+      prisma.scanHistory.findMany({
+        orderBy: { startedAt: 'desc' },
+        take: 10
+      }),
+      prisma.scanHistory.findFirst({
+        where: { status: 'RUNNING' },
+        orderBy: { startedAt: 'desc' }
+      }),
+      prisma.scanHistory.findFirst({
+        where: { status: 'COMPLETED' },
+        orderBy: { completedAt: 'desc' }
+      }),
+      prisma.scanHistory.groupBy({
+        by: ['status'],
+        _count: { _all: true }
+      }),
+    ]);
 
     // Calculate statistics
-    const totalScans = await prisma.scanHistory.count();
-    const successfulScans = await prisma.scanHistory.count({
-      where: { status: 'COMPLETED' }
-    });
-    const failedScans = await prisma.scanHistory.count({
-      where: { status: 'FAILED' }
-    });
+    const countFor = (status: string) =>
+      statusCounts.find(row => row.status === status)?._count._all ?? 0;
+    const totalScans = statusCounts.reduce((sum, row) => sum + row._count._all, 0);
+    const successfulScans = countFor('COMPLETED');
+    const failedScans = countFor('FAILED');
 
     return NextResponse.json({
       status: 'healthy',

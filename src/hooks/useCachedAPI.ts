@@ -29,93 +29,105 @@ const isCacheValid = (entry: CacheEntry<unknown>): boolean => {
   return Date.now() < entry.expiresAt;
 };
 
+const getValidCacheEntry = (cacheKey: string): CacheEntry<unknown> | undefined => {
+  const entry = globalCache[cacheKey];
+  return entry && isCacheValid(entry) ? entry : undefined;
+};
+
+// Shared by the hook and prefetchAPI so a prefetch in flight is reused, not duplicated.
+const fetchIntoCache = (url: string, cacheKey: string): Promise<unknown> => {
+  if (cacheKey in globalFetchPromises) return globalFetchPromises[cacheKey];
+
+  const fetchPromise = (async () => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const result = await response.json();
+    globalCache[cacheKey] = {
+      data: result,
+      timestamp: Date.now(),
+      expiresAt: getNextHourTimestamp()
+    };
+    return result;
+  })().finally(() => {
+    delete globalFetchPromises[cacheKey];
+  });
+
+  globalFetchPromises[cacheKey] = fetchPromise;
+  return fetchPromise;
+};
+
+const buildCacheKey = (url: string, dependencies: unknown[]) =>
+  `${url}:${JSON.stringify(dependencies)}`;
+
+/**
+ * Warm the cache for a request the user is likely to make next (e.g. the previous
+ * period), so navigating to it renders instantly. Failures are ignored.
+ */
+export const prefetchAPI = (url: string, dependencies: unknown[] = []) => {
+  const cacheKey = buildCacheKey(url, dependencies);
+  if (getValidCacheEntry(cacheKey)) return;
+  fetchIntoCache(url, cacheKey).catch(() => {});
+};
+
 export function useCachedAPI<T>(
   url: string,
   dependencies: unknown[] = [],
   enabled: boolean = true
 ) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Create stable cache key
+  const cacheKey = buildCacheKey(url, dependencies);
+
+  // Seed from the cache so a revisited tab renders immediately instead of flashing a
+  // loading state for one frame.
+  const [data, setData] = useState<T | null>(
+    () => (getValidCacheEntry(cacheKey)?.data as T | undefined) ?? null
+  );
+  const [loading, setLoading] = useState(() => !getValidCacheEntry(cacheKey));
   const [error, setError] = useState<string | null>(null);
   const [fetchTrigger, setFetchTrigger] = useState(0);
 
   const fetchingRef = useRef(false);
 
-  // Create stable cache key
-  const cacheKey = `${url}:${JSON.stringify(dependencies)}`;
-
   useEffect(() => {
     if (!enabled) return;
 
-    const fetchData = async () => {
-      // Check cache first
-      const cachedEntry = globalCache[cacheKey];
-      if (cachedEntry && isCacheValid(cachedEntry)) {
-        setData(cachedEntry.data as T);
-        setLoading(false);
-        setError(null);
-        return;
-      }
+    // Set on cleanup: a response for a key the component has moved past (e.g. the user
+    // clicked "Previous" twice quickly) must not overwrite the newer one.
+    let cancelled = false;
 
-      // Check if there's already a pending request for this URL
-      if (cacheKey in globalFetchPromises) {
-        try {
-          const result = await globalFetchPromises[cacheKey];
-          setData(result as T);
-          setLoading(false);
-          setError(null);
-          return;
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Network error');
-          setLoading(false);
-          return;
-        }
-      }
-
-      fetchingRef.current = true;
-      setLoading(true);
+    const cachedEntry = getValidCacheEntry(cacheKey);
+    if (cachedEntry) {
+      setData(cachedEntry.data as T);
+      setLoading(false);
       setError(null);
+      return;
+    }
 
-      // Create and store the fetch promise
-      const fetchPromise = (async () => {
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        return await response.json();
-      })();
+    fetchingRef.current = true;
+    setLoading(true);
+    setError(null);
 
-      globalFetchPromises[cacheKey] = fetchPromise;
-
-      try {
-        const result = await fetchPromise;
-
-        // Cache the result immediately
-        globalCache[cacheKey] = {
-          data: result,
-          timestamp: Date.now(),
-          expiresAt: getNextHourTimestamp()
-        };
-
+    fetchIntoCache(url, cacheKey)
+      .then(result => {
+        if (cancelled) return;
         setData(result as T);
         setError(null);
-        setLoading(false);
-      } catch (err) {
+      })
+      .catch(err => {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Network error');
-
-        // Keep showing cached data if available
-        if (!cachedEntry) {
-          setData(null);
-        }
-        setLoading(false);
-      } finally {
-        // Clean up the promise and reset fetch state
-        delete globalFetchPromises[cacheKey];
+        setData(null);
+      })
+      .finally(() => {
         fetchingRef.current = false;
-      }
-    };
+        if (!cancelled) setLoading(false);
+      });
 
-    fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [url, cacheKey, enabled, fetchTrigger]);
 
   // Cleanup on unmount

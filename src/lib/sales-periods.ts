@@ -10,8 +10,8 @@ import {
  * sales. Used by the Overview (`/api/items`) and the analytics routes so every tab
  * derives its numbers from exactly the same rules.
  *
- * Records are expected newest-first, as returned by `getBatchSalesHistory` /
- * `getSalesHistory`. Each scan's delta (`record[i] - record[i + 1]`) is attributed to
+ * Records are expected newest-first, as returned by `getSalesRecordsInRange` /
+ * `getBatchSalesHistory`. Each scan's delta (`record[i] - record[i + 1]`) is attributed to
  * `record[i].scannedAt`; negative deltas are clamped to 0.
  */
 export interface SalesRecordLike {
@@ -93,4 +93,52 @@ export function getDailySalesTotals(
       totalSales: bucket.totalSales,
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export interface PeriodRange {
+  start: Date;
+  end: Date;
+}
+
+/**
+ * Percentage change of sales in `current` versus `previous`.
+ *
+ * When `current` is still in progress, only the same elapsed span of `previous` is
+ * counted (e.g. today until 14:00 vs. yesterday until 14:00), so a partial period is
+ * never compared against a full one. Returns 0 when there is no previous baseline.
+ */
+export function calculatePeriodGrowth(
+  records: SalesRecordLike[],
+  current: PeriodRange,
+  previous: PeriodRange,
+  now: Date = new Date()
+): number {
+  const currentEnd = now < current.end ? now : current.end;
+  if (currentEnd < current.start) return 0;
+
+  const elapsed = currentEnd.getTime() - current.start.getTime();
+  const previousEnd = new Date(Math.min(previous.end.getTime(), previous.start.getTime() + elapsed));
+
+  const currentSales = sumSalesInRange(records, current.start, currentEnd);
+  const previousSales = sumSalesInRange(records, previous.start, previousEnd);
+
+  return previousSales > 0 ? ((currentSales - previousSales) / previousSales) * 100 : 0;
+}
+
+/** Parse a `daysAgo` / `weeksAgo` / `monthsAgo` query param into a safe, non-negative integer. */
+export function parsePeriodOffset(value: string | null, max: number = 3650): number {
+  const parsed = Number.parseInt(value ?? '0', 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.min(parsed, max);
+}
+
+/**
+ * Cache-Control for an analytics response. A finished period can no longer change (each
+ * scan's delta is attributed to the scan time), so the CDN may serve it for a while;
+ * the current period changes with every scan and is never cached.
+ */
+export function periodCacheHeaders(offset: number): HeadersInit {
+  return offset > 0
+    ? { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=86400' }
+    : { 'Cache-Control': 'no-store' };
 }

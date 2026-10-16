@@ -2,11 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Set the application timezone to Melbourne
-if (typeof process !== 'undefined') {
-  process.env.TZ = 'Australia/Melbourne';
-}
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

@@ -1,48 +1,25 @@
 import { NextResponse } from 'next/server';
-import { DatabaseService } from '@/lib/database';
-import { TRACKED_ITEMS } from '@/config/items';
-import { getDatePartsInTimezone, getDayBoundariesInTimezone, getDayOfMonthInTimezone, getDaysInMonthOf } from '@/lib/timezone';
+import { getDayOfMonthInTimezone, getDaysInMonthOf, getMonthBoundariesInTimezone } from '@/lib/timezone';
+import { calculatePeriodGrowth, parsePeriodOffset, periodCacheHeaders } from '@/lib/sales-periods';
+import { itemSummary, loadTrackedItemSales } from '@/lib/period-data';
 
 export const dynamic = 'force-dynamic';
 
 async function getMonthlyAnalyticsData(monthsAgo: number) {
   const now = new Date();
-  const nowParts = getDatePartsInTimezone(now);
-  let targetMonth = nowParts.month - monthsAgo;
-  let targetYear = nowParts.year;
-  if (targetMonth < 0) {
-    targetMonth += 12;
-    targetYear -= 1;
-  }
+  // Boundaries resolve in the tracking timezone; the local-time Date constructor would
+  // follow the process clock, which is Melbourne locally but UTC on Vercel.
+  const month = getMonthBoundariesInTimezone(now, monthsAgo);
+  const previousMonth = getMonthBoundariesInTimezone(now, monthsAgo + 1);
 
-  // Built in UTC, then snapped to the tracking timezone's day boundaries. Using the
-  // local-time Date constructor here would resolve against the process clock, which is
-  // Melbourne locally but UTC on Vercel.
-  const monthStartDate = new Date(Date.UTC(targetYear, targetMonth, 1, 12));
-  const monthEndDate = new Date(Date.UTC(targetYear, targetMonth + 1, 0, 12));
+  // Days in the target month, resolved in the tracking timezone
+  const daysInMonth = getDaysInMonthOf(month.start);
 
-  const { start: monthStart } = getDayBoundariesInTimezone(monthStartDate);
-  const { end: monthEnd } = getDayBoundariesInTimezone(monthEndDate);
+  // Target month plus the month before it (for growth), and one baseline record before that.
+  const trackedSales = await loadTrackedItemSales(previousMonth.start, month.end);
 
-  // Days in the target month, resolved in the tracking timezone rather than via
-  // monthEnd.getDate(), which reads the process clock.
-  const daysInMonth = getDaysInMonthOf(monthStartDate);
-
-  const db = new DatabaseService();
-  const allItems = await db.getAllItems();
-
-  // Filter items to only show those in current config
-  const configUrls = TRACKED_ITEMS.map(item => item.url);
-  const items = allItems.filter(item => configUrls.includes(item.url));
-
-  // OPTIMIZATION: Fetch all sales history in one query instead of N queries
-  const itemIds = items.map(item => item.id);
-  const batchSalesHistory = await db.getBatchSalesHistory(itemIds, 90);
-
-  // Generate daily breakdown data for each item (days of the month)
-  const monthlyView = items.map((item) => {
-    // Get sales history for this item from the batch result
-    const salesHistory = batchSalesHistory.get(item.id) || [];
+  return trackedSales.map((entry) => {
+    const salesHistory = entry.records;
 
     // Initialize daily breakdown for the month (1-based day numbers)
     const dailyBreakdown = Array.from({ length: daysInMonth }, (_, index) => ({
@@ -53,12 +30,9 @@ async function getMonthlyAnalyticsData(monthsAgo: number) {
     // Calculate daily sales from history - only for the target month
     for (let i = 0; i < salesHistory.length - 1; i++) {
       const current = salesHistory[i];
-      const previous = salesHistory[i + 1];
 
-      // Check if this record is within our target month
-      if (current.scannedAt >= monthStart && current.scannedAt <= monthEnd) {
-        const dailySales = Math.max(0, current.salesCount - previous.salesCount);
-
+      if (current.scannedAt >= month.start && current.scannedAt <= month.end) {
+        const dailySales = Math.max(0, current.salesCount - salesHistory[i + 1].salesCount);
         const dayOfMonth = getDayOfMonthInTimezone(current.scannedAt);
         if (dayOfMonth >= 1 && dayOfMonth <= daysInMonth) {
           dailyBreakdown[dayOfMonth - 1].sales += dailySales;
@@ -72,58 +46,27 @@ async function getMonthlyAnalyticsData(monthsAgo: number) {
       day.sales > dailyBreakdown[peak].sales ? index : peak, 0);
     const peakDaySales = dailyBreakdown[peakDay].sales;
 
-    // Calculate growth (simple comparison of recent vs previous periods)
-    const recentSales = salesHistory.slice(0, Math.floor(salesHistory.length / 2))
-      .reduce((sum, record, index) => {
-        if (index < salesHistory.length / 2 - 1) {
-          return sum + Math.max(0, record.salesCount - salesHistory[index + 1].salesCount);
-        }
-        return sum;
-      }, 0);
-
-    const previousSales = salesHistory.slice(Math.floor(salesHistory.length / 2))
-      .reduce((sum, record, index) => {
-        if (index < salesHistory.length / 2 - 1) {
-          const nextIndex = Math.floor(salesHistory.length / 2) + index + 1;
-          if (nextIndex < salesHistory.length) {
-            return sum + Math.max(0, record.salesCount - salesHistory[nextIndex].salesCount);
-          }
-        }
-        return sum;
-      }, 0);
-
-    const growth = previousSales > 0 ? ((recentSales - previousSales) / previousSales) * 100 : 0;
-
     return {
-      id: item.id,
-      name: item.name,
-      url: item.url,
-      envatoId: item.envatoId,
-      author: item.author || undefined,
-      category: item.category || undefined,
-      latestSales: salesHistory[0]?.salesCount || 0,
-      latestPrice: salesHistory[0]?.price || undefined,
-      lastScanned: salesHistory[0]?.scannedAt?.toISOString(),
+      ...itemSummary(entry),
       dailyBreakdown,
       totalMonthlySales,
       peakDay: peakDay + 1, // Convert back to 1-based day
       peakDaySales,
-      growth,
-      monthStart: monthStart.toISOString(),
-      monthEnd: monthEnd.toISOString()
+      // Versus the previous month (same elapsed span while the month is still in progress)
+      growth: calculatePeriodGrowth(salesHistory, month, previousMonth, now),
+      monthStart: month.start.toISOString(),
+      monthEnd: month.end.toISOString()
     };
   });
-
-  return monthlyView;
 }
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const monthsAgo = parseInt(searchParams.get('monthsAgo') || '0');
+    const monthsAgo = parsePeriodOffset(searchParams.get('monthsAgo'), 120);
 
     const monthlyView = await getMonthlyAnalyticsData(monthsAgo);
-    return NextResponse.json(monthlyView);
+    return NextResponse.json(monthlyView, { headers: periodCacheHeaders(monthsAgo) });
   } catch (error) {
     console.error('Monthly analytics error:', error);
     return NextResponse.json({ error: 'Failed to fetch monthly analytics' }, { status: 500 });

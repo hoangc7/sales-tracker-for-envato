@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { useEffect, useState } from 'react';
+import { prefetchAPI, useCachedAPI } from '@/hooks/useCachedAPI';
+import { useOldestDate } from '@/hooks/useOldestDate';
 import { formatInTimezone, formatTimestamp } from '@/lib/timezone';
 
 interface DailyBreakdown {
@@ -39,27 +40,15 @@ export function WeeklyDashboard() {
     error 
   } = useCachedAPI<WeeklyItemData[]>(`/api/analytics/weekly?weeksAgo=${weeksAgo}`, [weeksAgo]);
 
-  const { 
-    data: dateRangeData 
-  } = useCachedAPI<{oldestDate?: string}>('/api/analytics/data-range?type=oldest');
+  const { canGoToPreviousWeek } = useOldestDate();
+  const canGoBack = canGoToPreviousWeek(weeksAgo);
 
-  // Extract oldest date from cached data
-  const oldestDate = dateRangeData?.oldestDate ? new Date(dateRangeData.oldestDate) : null;
-
-  const canGoToPreviousWeek = (weeksAgoCheck: number): boolean => {
-    if (!oldestDate) return true; // If we don't know, allow navigation
-
-    const now = new Date();
-    const currentDay = now.getDay();
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
-
-    // Calculate Monday of the week we would navigate to
-    const targetMonday = new Date(now);
-    targetMonday.setDate(now.getDate() - daysToMonday - ((weeksAgoCheck + 1) * 7));
-    targetMonday.setHours(0, 0, 0, 0);
-
-    return targetMonday >= oldestDate;
-  };
+  // Warm the previous week once this one has loaded, so "Previous" renders instantly.
+  useEffect(() => {
+    if (!loading && canGoBack) {
+      prefetchAPI(`/api/analytics/weekly?weeksAgo=${weeksAgo + 1}`, [weeksAgo + 1]);
+    }
+  }, [loading, canGoBack, weeksAgo]);
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
@@ -146,13 +135,13 @@ export function WeeklyDashboard() {
         <div className="flex items-center gap-2">
           <button
             onClick={goToPreviousWeek}
-            disabled={!canGoToPreviousWeek(weeksAgo)}
+            disabled={!canGoBack}
             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              !canGoToPreviousWeek(weeksAgo)
+              !canGoBack
                 ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
-            title={!canGoToPreviousWeek(weeksAgo) ? "No older data available" : "Previous week"}
+            title={!canGoBack ? "No older data available" : "Previous week"}
           >
             ← Previous
           </button>
