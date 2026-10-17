@@ -12,6 +12,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { useOldestDate } from '@/hooks/useOldestDate';
 import { formatInTimezone, formatTimestamp, getDaysInMonthOf } from '@/lib/timezone';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ function SectionHeader({
 
 // ── Daily Section ──────────────────────────────────────────────────────────
 
-function DailySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: Date | null }) {
+function DailySection({ envatoId, canGoBack }: { envatoId: string; canGoBack: (offset: number) => boolean }) {
   const [daysAgo, setDaysAgo] = useState(0);
 
   const { data: allItems, loading } = useCachedAPI<DailyItemData[]>(
@@ -174,13 +175,7 @@ function DailySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: 
 
   const item = allItems?.find((i) => i.envatoId === envatoId);
 
-  const canGoToPrev = (() => {
-    if (!oldestDate) return true;
-    const target = new Date();
-    target.setDate(target.getDate() - (daysAgo + 1));
-    target.setHours(0, 0, 0, 0);
-    return target >= oldestDate;
-  })();
+  const canGoToPrev = canGoBack(daysAgo);
 
   const dayLabel =
     daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} Days Ago`;
@@ -205,7 +200,7 @@ function DailySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: 
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
       <SectionHeader
         title="Daily Breakdown"
-        subtitle={`${dayLabel}${dateLabel ? ` · ${dateLabel}` : ''} · Hourly sales (GMT+7)`}
+        subtitle={`${dayLabel}${dateLabel ? ` · ${dateLabel}` : ''} · Hourly sales (Melbourne time)`}
         onPrev={() => setDaysAgo((p) => p + 1)}
         onNext={() => setDaysAgo((p) => Math.max(0, p - 1))}
         onReset={() => setDaysAgo(0)}
@@ -254,7 +249,7 @@ function DailySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: 
             <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
             <Tooltip
               formatter={(value) => [value, 'Sales']}
-              labelFormatter={(label) => `Hour ${label} (GMT+7)`}
+              labelFormatter={(label) => `Hour ${label} (Melbourne time)`}
               contentStyle={{ fontSize: 12 }}
             />
             <Bar dataKey="sales" fill="#22c55e" radius={[3, 3, 0, 0]} maxBarSize={24} />
@@ -271,7 +266,7 @@ function DailySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: 
 
 // ── Weekly Section ─────────────────────────────────────────────────────────
 
-function WeeklySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: Date | null }) {
+function WeeklySection({ envatoId, canGoBack }: { envatoId: string; canGoBack: (offset: number) => boolean }) {
   const [weeksAgo, setWeeksAgo] = useState(0);
 
   const { data: allItems, loading } = useCachedAPI<WeeklyItemData[]>(
@@ -281,15 +276,7 @@ function WeeklySection({ envatoId, oldestDate }: { envatoId: string; oldestDate:
 
   const item = allItems?.find((i) => i.envatoId === envatoId);
 
-  const canGoToPrev = (() => {
-    if (!oldestDate) return true;
-    const now = new Date();
-    const daysToMon = now.getDay() === 0 ? 6 : now.getDay() - 1;
-    const targetMon = new Date(now);
-    targetMon.setDate(now.getDate() - daysToMon - (weeksAgo + 1) * 7);
-    targetMon.setHours(0, 0, 0, 0);
-    return targetMon >= oldestDate;
-  })();
+  const canGoToPrev = canGoBack(weeksAgo);
 
   const weekLabel =
     weeksAgo === 0 ? 'This Week' : weeksAgo === 1 ? 'Last Week' : `${weeksAgo} Weeks Ago`;
@@ -379,7 +366,7 @@ function WeeklySection({ envatoId, oldestDate }: { envatoId: string; oldestDate:
 
 // ── Monthly Section ────────────────────────────────────────────────────────
 
-function MonthlySection({ envatoId, oldestDate }: { envatoId: string; oldestDate: Date | null }) {
+function MonthlySection({ envatoId, canGoBack }: { envatoId: string; canGoBack: (offset: number) => boolean }) {
   const [monthsAgo, setMonthsAgo] = useState(0);
 
   const { data: allItems, loading } = useCachedAPI<MonthlyItemData[]>(
@@ -389,12 +376,7 @@ function MonthlySection({ envatoId, oldestDate }: { envatoId: string; oldestDate
 
   const item = allItems?.find((i) => i.envatoId === envatoId);
 
-  const canGoToPrev = (() => {
-    if (!oldestDate) return true;
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth() - (monthsAgo + 1), 1);
-    return target >= oldestDate;
-  })();
+  const canGoToPrev = canGoBack(monthsAgo);
 
   const monthLabel =
     monthsAgo === 0 ? 'This Month' : monthsAgo === 1 ? 'Last Month' : `${monthsAgo} Months Ago`;
@@ -486,12 +468,9 @@ function MonthlySection({ envatoId, oldestDate }: { envatoId: string; oldestDate
 
 export function ItemDetailPage({ envatoId }: { envatoId: string }) {
   const { data: allItems, loading: itemsLoading } = useCachedAPI<ItemData[]>('/api/items');
-  const { data: dateRangeData } = useCachedAPI<{ oldestDate?: string }>(
-    '/api/analytics/data-range?type=oldest',
-  );
+  const { canGoToPreviousDay, canGoToPreviousWeek, canGoToPreviousMonth } = useOldestDate();
 
   const item = allItems?.find((i) => i.envatoId === envatoId);
-  const oldestDate = dateRangeData?.oldestDate ? new Date(dateRangeData.oldestDate) : null;
 
   const todaySales = item?.dailySales?.[0]?.dailySales ?? 0;
 
@@ -588,9 +567,9 @@ export function ItemDetailPage({ envatoId }: { envatoId: string }) {
       )}
 
       {/* Stacked analytics sections */}
-      <DailySection envatoId={envatoId} oldestDate={oldestDate} />
-      <WeeklySection envatoId={envatoId} oldestDate={oldestDate} />
-      <MonthlySection envatoId={envatoId} oldestDate={oldestDate} />
+      <DailySection envatoId={envatoId} canGoBack={canGoToPreviousDay} />
+      <WeeklySection envatoId={envatoId} canGoBack={canGoToPreviousWeek} />
+      <MonthlySection envatoId={envatoId} canGoBack={canGoToPreviousMonth} />
     </div>
   );
 }

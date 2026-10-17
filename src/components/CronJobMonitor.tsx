@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatTimestamp } from '@/lib/timezone';
+
+// Scan times are instants — render them in the display timezone, not the viewer's clock.
+const FULL_TIMESTAMP: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
 
 interface ScanHistory {
   id: string;
@@ -139,7 +143,7 @@ export default function CronJobMonitor() {
           <h4 className="font-medium text-blue-900 mb-2">Currently Running</h4>
           <div className="text-sm text-blue-700">
             <p>Scan ID: {status.currentStatus.runningScan.id}</p>
-            <p>Started: {new Date(status.currentStatus.runningScan.startedAt).toLocaleString()}</p>
+            <p>Started: {formatTimestamp(status.currentStatus.runningScan.startedAt, FULL_TIMESTAMP)}</p>
             <p>Duration: {status.currentStatus.runningScan.duration}</p>
           </div>
         </div>
@@ -172,7 +176,7 @@ export default function CronJobMonitor() {
           <div className="text-sm text-green-700">
             <p>Scan ID: {status.lastSuccessfulScan.id}</p>
             <p>Completed: {status.lastSuccessfulScan.completedAt ?
-              new Date(status.lastSuccessfulScan.completedAt).toLocaleString() : 'N/A'}</p>
+              formatTimestamp(status.lastSuccessfulScan.completedAt, FULL_TIMESTAMP) : 'N/A'}</p>
             <p>Items Scanned: {status.lastSuccessfulScan.itemsScanned || 'N/A'}</p>
           </div>
         </div>
@@ -189,7 +193,7 @@ export default function CronJobMonitor() {
                   {scan.status}
                 </span>
                 <span className="text-sm text-gray-600">
-                  {new Date(scan.startedAt).toLocaleString()}
+                  {formatTimestamp(scan.startedAt, FULL_TIMESTAMP)}
                 </span>
               </div>
               <div className="text-sm text-gray-600">
@@ -209,7 +213,7 @@ export default function CronJobMonitor() {
       </div>
 
       <div className="mt-4 text-xs text-gray-500 text-center">
-        Last updated: {new Date(status.timestamp).toLocaleString()}
+        Last updated: {formatTimestamp(status.timestamp, FULL_TIMESTAMP)}
       </div>
     </div>
   );

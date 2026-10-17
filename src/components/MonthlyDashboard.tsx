@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { useEffect, useState } from 'react';
+import { prefetchAPI, useCachedAPI } from '@/hooks/useCachedAPI';
+import { useOldestDate } from '@/hooks/useOldestDate';
 import { formatInTimezone, formatTimestamp, getMonthInTimezone } from '@/lib/timezone';
 
 interface DailyBreakdown {
@@ -38,21 +39,15 @@ export function MonthlyDashboard() {
     error 
   } = useCachedAPI<MonthlyItemData[]>(`/api/analytics/monthly?monthsAgo=${monthsAgo}`, [monthsAgo]);
 
-  const { 
-    data: dateRangeData 
-  } = useCachedAPI<{oldestDate?: string}>('/api/analytics/data-range?type=oldest');
+  const { canGoToPreviousMonth } = useOldestDate();
+  const canGoBack = canGoToPreviousMonth(monthsAgo);
 
-  // Extract oldest date from cached data
-  const oldestDate = dateRangeData?.oldestDate ? new Date(dateRangeData.oldestDate) : null;
-
-  const canGoToPreviousMonth = (monthsAgoCheck: number): boolean => {
-    if (!oldestDate) return true; // If we don't know, allow navigation
-
-    const now = new Date();
-    const targetDate = new Date(now.getFullYear(), now.getMonth() - (monthsAgoCheck + 1), 1);
-
-    return targetDate >= oldestDate;
-  };
+  // Warm the previous month once this one has loaded, so "Previous" renders instantly.
+  useEffect(() => {
+    if (!loading && canGoBack) {
+      prefetchAPI(`/api/analytics/monthly?monthsAgo=${monthsAgo + 1}`, [monthsAgo + 1]);
+    }
+  }, [loading, canGoBack, monthsAgo]);
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
@@ -137,13 +132,13 @@ export function MonthlyDashboard() {
         <div className="flex items-center gap-2">
           <button
             onClick={goToPreviousMonth}
-            disabled={!canGoToPreviousMonth(monthsAgo)}
+            disabled={!canGoBack}
             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              !canGoToPreviousMonth(monthsAgo)
+              !canGoBack
                 ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
-            title={!canGoToPreviousMonth(monthsAgo) ? "No older data available" : "Previous month"}
+            title={!canGoBack ? "No older data available" : "Previous month"}
           >
             ← Previous
           </button>

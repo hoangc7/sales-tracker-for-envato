@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useCachedAPI } from '@/hooks/useCachedAPI';
+import { useEffect, useState } from 'react';
+import { prefetchAPI, useCachedAPI } from '@/hooks/useCachedAPI';
+import { useOldestDate } from '@/hooks/useOldestDate';
 import { formatInTimezone, formatTimestamp } from '@/lib/timezone';
 
 interface HourlyBreakdown {
@@ -38,23 +39,15 @@ export function DailyDashboard() {
     error
   } = useCachedAPI<DailyItemData[]>(`/api/analytics/daily?daysAgo=${daysAgo}`, [daysAgo]);
 
-  const {
-    data: dateRangeData
-  } = useCachedAPI<{oldestDate?: string}>('/api/analytics/data-range?type=oldest');
+  const { canGoToPreviousDay } = useOldestDate();
+  const canGoBack = canGoToPreviousDay(daysAgo);
 
-  // Extract oldest date from cached data
-  const oldestDate = dateRangeData?.oldestDate ? new Date(dateRangeData.oldestDate) : null;
-
-  const canGoToPreviousDay = (daysAgoCheck: number): boolean => {
-    if (!oldestDate) return true; // If we don't know, allow navigation
-
-    const now = new Date();
-    const targetDate = new Date(now);
-    targetDate.setDate(now.getDate() - (daysAgoCheck + 1));
-    targetDate.setHours(0, 0, 0, 0);
-
-    return targetDate >= oldestDate;
-  };
+  // Warm the previous day once this one has loaded, so "Previous" renders instantly.
+  useEffect(() => {
+    if (!loading && canGoBack) {
+      prefetchAPI(`/api/analytics/daily?daysAgo=${daysAgo + 1}`, [daysAgo + 1]);
+    }
+  }, [loading, canGoBack, daysAgo]);
 
   const formatNumber = (num: number) => {
     return num.toLocaleString();
@@ -139,13 +132,13 @@ export function DailyDashboard() {
         <div className="flex items-center gap-2">
           <button
             onClick={goToPreviousDay}
-            disabled={!canGoToPreviousDay(daysAgo)}
+            disabled={!canGoBack}
             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              !canGoToPreviousDay(daysAgo)
+              !canGoBack
                 ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
-            title={!canGoToPreviousDay(daysAgo) ? "No older data available" : "Previous day"}
+            title={!canGoBack ? "No older data available" : "Previous day"}
           >
             ← Previous
           </button>
@@ -186,7 +179,7 @@ export function DailyDashboard() {
           </p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-sm font-medium text-gray-500">Peak Hour (GMT+7)</h3>
+          <h3 className="text-sm font-medium text-gray-500">Peak Hour (Melbourne)</h3>
           <p className="text-2xl font-bold text-blue-600">
             {items && items.length > 0 ? formatHour(getMostActiveHour(items)) : '--:--'}
           </p>
@@ -218,7 +211,7 @@ export function DailyDashboard() {
                   <th
                     key={hour}
                     className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[50px]"
-                    title={`${formatHour(hour)} GMT+7`}
+                    title={`${formatHour(hour)} Melbourne time`}
                   >
                     {hour.toString().padStart(2, '0')}h
                   </th>
@@ -229,8 +222,10 @@ export function DailyDashboard() {
               {sortedItems.map((item, index) => {
                 // Create array with sales for each hour (0-23)
                 const hourlySales = new Array(24).fill(0);
+                const reportedHours = new Set<number>();
                 item.hourlyBreakdown.forEach(hourData => {
                   hourlySales[hourData.hour] = hourData.sales;
+                  reportedHours.add(hourData.hour);
                 });
 
                 const maxHourlySales = Math.max(...hourlySales);
@@ -297,7 +292,7 @@ export function DailyDashboard() {
                             className="h-8 w-full rounded flex items-center justify-center text-xs font-medium"
                             style={{ backgroundColor: bgColor }}
                           >
-                            {item.hourlyBreakdown.some(h => h.hour === hour) && (
+                            {reportedHours.has(hour) && (
                               <span className={intensity > 0.5 ? 'text-white' : 'text-gray-700'}>
                                 {sales}
                               </span>

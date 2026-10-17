@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { DatabaseService } from '@/lib/database';
 
+export const dynamic = 'force-dynamic';
+
+// The oldest scan never changes and the newest moves at most once per scan.
+const CACHE_HEADERS = { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=86400' };
+
 // Cache for data range - since this rarely changes, we can cache it for 24 hours
 let cachedDataRange: { oldestDate: Date; newestDate: Date } | null = null;
 let cacheTimestamp: number = 0;
@@ -16,7 +21,7 @@ export async function GET(request: Request) {
     // Check if we have a valid cached result
     if (cachedDataRange && (now - cacheTimestamp) < CACHE_DURATION) {
       const response = buildResponse(cachedDataRange, type, true);
-      return NextResponse.json(response);
+      return NextResponse.json(response, { headers: CACHE_HEADERS });
     }
 
     const db = new DatabaseService();
@@ -43,7 +48,7 @@ export async function GET(request: Request) {
     cacheTimestamp = now;
 
     const response = buildResponse(cachedDataRange, type, false);
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: CACHE_HEADERS });
   } catch (error) {
     console.error('Data range API error:', error);
     return NextResponse.json({ error: 'Failed to fetch data range' }, { status: 500 });

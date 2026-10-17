@@ -55,13 +55,14 @@ src/
 │   └── ViewToggle.tsx              # Table/Cards view toggle
 ├── hooks/
 │   ├── useCachedAPI.ts             # Client-side cache (1-hour expiry, dedup)
-│   └── useOldestDate.ts            # Navigation boundary from oldest data point
+│   └── useOldestDate.ts            # Timezone-aware "previous" bounds from oldest data point
 ├── lib/
 │   ├── envato-api.ts               # Envato API v3 client
 │   ├── scanner.ts                  # Batch scan orchestration
 │   ├── database.ts                 # Prisma CRUD + sales delta calculations
 │   ├── analytics.ts                # Hourly/daily/weekly/monthly aggregations
-│   ├── sales-periods.ts            # Shared per-day/per-range delta aggregation
+│   ├── sales-periods.ts            # Shared per-day/per-range delta aggregation + growth
+│   ├── period-data.ts              # Loads tracked items + records for one period window
 │   ├── timezone.ts                 # Timezone utility functions
 │   └── cache.ts                    # Cache tags and revalidation config
 └── config/
@@ -131,11 +132,18 @@ omitted rather than reported as zero. Both fields are derived by `lib/sales-peri
 same day/week boundaries as the analytics routes, so the Overview always agrees with the
 Daily/Weekly tabs.
 
+Analytics routes load **only the requested window** (plus the previous period, for growth)
+via `loadTrackedItemSales` → `getSalesRecordsInRange`, which also returns one baseline record
+before the window so its first delta is correct. Any `daysAgo`/`weeksAgo`/`monthsAgo` works.
+`growth` = % change vs. the previous period; for the in-progress period only the same elapsed
+span of the previous one is compared. Finished periods are sent with `s-maxage=600`; the current
+period with `no-store`.
+
 ### `GET /api/analytics/daily?daysAgo=N`
 24-hour breakdown. `daysAgo=0` is today (Melbourne time). Returns per-item `hourlyBreakdown[24]`, `totalDailySales`, `peakHour`, `peakHourSales`, `growth`, `dayStart`, `dayEnd`.
 
 ### `GET /api/analytics/weekly?weeksAgo=N`
-7-day breakdown (Mon–Sun). Returns per-item `dailyBreakdown[7]`, `totalWeeklySales`, `peakDay`, `growth`, `weekStart`, `weekEnd`.
+7-day breakdown (Mon–Sun). Returns per-item `dailyBreakdown[7]`, `totalWeeklySales`, `peakDay` (day number, 0=Sun), `growth`, `weekStart`, `weekEnd`.
 
 ### `GET /api/analytics/monthly?monthsAgo=N`
 Daily breakdown for the full month. Returns per-item `dailyBreakdown[1..31]`, `totalMonthlySales`, `peakDay`, `growth`, `monthStart`, `monthEnd`.
@@ -153,7 +161,12 @@ Returns the oldest/newest scan timestamps; used to disable "previous" navigation
   - Never label a period with `DISPLAY_TIMEZONE` — Melbourne Monday 00:00 is Sunday 21:00 in GMT+7, so the label lands on the wrong bucket.
 - **Client components must format dates with an explicit timezone.** APIs return boundaries as ISO instants; a bare `toLocaleDateString()`/`getMonth()` resolves in the *viewer's* clock and shifts labels onto neighbouring days or months. Use `formatInTimezone` (periods) and `formatTimestamp` (instants) instead — never raw `Date` getters on a boundary value.
 - When adding date logic, always use `timezone.ts` helpers; never rely on `getHours()`, `getDate()`, `setHours()` or `toLocaleString()` round-trips, which all silently follow the process clock and produce different results locally vs. on Vercel
-- Day and week boundaries come from `getDayBoundariesInTimezone` / `getWeekBoundariesInTimezone`; every dashboard must use the same ones or its totals will disagree with the other tabs
+- Day, week and month boundaries come from `getDayBoundariesInTimezone` / `getDayBoundariesDaysAgo` / `getWeekBoundariesInTimezone` / `getMonthBoundariesInTimezone` (DST-aware: 23h/25h days); every dashboard must use the same ones or its totals will disagree with the other tabs
+- `Intl.DateTimeFormat` instances are cached inside `timezone.ts` — use its helpers rather than constructing formatters in hot loops
+
+### Database Queries
+- Never use nested `include: { salesRecords: { take: N } }` — Prisma paginates nested relations in memory, loading every record. Use `getLatestSalesRecords` (`DISTINCT ON`) instead.
+- Fetch history by period window with `getSalesRecordsInRange`, not "last N days".
 
 ### Sales Delta Calculation
 Raw data is cumulative. The pattern everywhere is:
@@ -179,7 +192,8 @@ The scanner will create the DB row automatically on next scan via `initializeDat
 - All dashboard components guard with `if (loading || !items) return <Skeleton />`
 - Reference item for comparison = `items[0]` (first in the config list)
 - Heatmap intensity = `salesCount / maxSalesInColumn` — darker = more sales
-- Navigation "previous" buttons are disabled via `useOldestDate` bounds checking
+- Navigation "previous" buttons are disabled via `useOldestDate` bounds checking (a period is reachable if it ends after the oldest scan)
+- Dashboards call `prefetchAPI` for the previous period once the current one loads
 
 ## Pages & Routes
 

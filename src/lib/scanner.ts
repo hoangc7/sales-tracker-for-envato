@@ -42,10 +42,12 @@ export class ScannerService {
     }
   }
 
-  async scanAllItems() {
+  async scanAllItems(): Promise<{ total: number; successful: number; failed: number; errors: string[] }> {
     console.log('Starting scan of all items...');
 
-    const items = await this.db.getAllItemsForScan();
+    // Only items still in the config — items removed from it keep their DB rows (and
+    // history) but no longer cost an API call per scan.
+    const items = await this.db.getAllItemsForScan(TRACKED_ITEMS.map(item => item.url));
 
     // Process items in parallel with controlled concurrency
     const BATCH_SIZE = 3; // Process 3 items at a time to respect rate limits
@@ -73,7 +75,8 @@ export class ScannerService {
 
         } catch (error) {
           console.error(`✗ Error scanning ID ${item.envatoId}:`, error);
-          return { success: false, item: item.envatoId, error };
+          const message = error instanceof Error ? error.message : String(error);
+          return { success: false, item: item.envatoId, error: `${item.envatoId}: ${message}` };
         }
       });
 
@@ -90,5 +93,12 @@ export class ScannerService {
     const failed = results.filter(r => !r.success).length;
 
     console.log(`Scan completed! ✓ ${successful} successful, ✗ ${failed} failed`);
+
+    return {
+      total: items.length,
+      successful,
+      failed,
+      errors: results.flatMap(r => (r.success || !r.error ? [] : [r.error])),
+    };
   }
 }
